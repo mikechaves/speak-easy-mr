@@ -1,0 +1,30 @@
+CommandItemPrefab (GameObject)
+|- RectTransform
+|- Image (Background)
+|- CommandItemPrefab.cs (Script)
+|
+|- LeftBorder (GameObject)
+|  |- RectTransform (Width: 5, Height: 70, Left-aligned)
+|  |- Image (Color: #2196F3)
+|
+|- CommandText (GameObject)
+|  |- RectTransform (Positioned with 10px padding from left border)
+|  |- TextMeshProUGUI (Font Size: 28, Bold, Left-aligned)
+|
+|- DescriptionText (GameObject)
+   |- RectTransform (Positioned below CommandText with small spacing)
+   |- TextMeshProUGUI (Font Size: 22, Normal, Left-aligned)
+
+Configuration Notes:
+- Background Image: Color RGBA(255, 255, 255, 0.05) - very subtle white
+- LeftBorder: Accent color (#2196F3)
+- CommandText: White color, bold, 28pt
+- DescriptionText: Light gray color, normal, 22pt
+
+Inspector Settings for CommandItemPrefab.cs:
+- Command Text: Reference to CommandText TMPro component
+- Description Text: Reference to DescriptionText TMPro component
+- Left Border: Reference to LeftBorder Image component
+- Background: Reference to Background Image component
+- DefaultBackgroundColor: RGBA(255, 255, 255, 0.05)
+- HighlightedBackgroundColor: RGBA(255, 255, 255, 0.2)
