@@ -5,12 +5,11 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 0
-    path: Assets/Scenes/SampleScene.unity
-    guid: 9fc0d4010bbf28b4594072e72b8655ab
   - enabled: 1
-    path: Assets/Scenes/TherapyEnvironment.unity
-    guid: fc88fc8e81b3d464bb99cd87ddaa6a24
+    path: Assets/Scenes/TherapyEnvironment-mcp.unity
+    guid: 99c9720ab356a0642a771bea13969a05
   m_configObjects:
-    com.unity.xr.management.loader_settings: {fileID: 11400000, guid: 262dc86d9f1804545ada35ce3d1d01a3, type: 2}
-    com.unity.xr.openxr.settings4: {fileID: 11400000, guid: e115ad9c6b0157a42af370a5feb357a3, type: 2}
+    com.unity.xr.management.loader_settings: {fileID: 11400000, guid: 4a98f6019a5b62043b48af94ed987a85,
+      type: 2}
+    com.unity.xr.openxr.settings4: {fileID: 11400000, guid: 87d735ca7219f24468ea3169988f07f1,
+      type: 2}
