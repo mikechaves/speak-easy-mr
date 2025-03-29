@@ -54,6 +54,15 @@ public class VisualizationEnvironment : MonoBehaviour, StepBehavior
             }
         }
     }
+
+    // ADD this new method
+    public void StopStep()
+    {
+        Debug.Log("<color=red>VisualizationEnvironment: StopStep() called by SessionController.</color>");
+        // HideEnvironment handles disabling the child environment object,
+        // We probably don't need to disable this root GameObject itself.
+        HideEnvironment();
+    }
     
     /// <summary>
     /// Implements StepBehavior interface to activate the visualization environment

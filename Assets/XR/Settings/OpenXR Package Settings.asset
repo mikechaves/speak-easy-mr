@@ -79,10 +79,9 @@ MonoBehaviour:
     XR_FB_hand_tracking_confidence XR_META_detached_controllers XR_LOGITECH_mx_ink_stylus_interaction
     XR_META_colocation_discovery XR_META_spatial_entity_sharing XR_META_spatial_entity_group_sharing
     XR_EXT_debug_utils XR_META_dynamic_object_tracker XR_META_dynamic_object_keyboard
-    XR_META_hand_tracking_microgestures XR_META_spatial_entity_persistence XR_META_spatial_entity_discovery
-    XR_META_boundary_visibility XR_METAX1_face_tracking_visemes XR_META_headset_id
-    XR_FB_composition_layer_settings XR_META_automatic_layer_filter XR_EXT_future
-    XR_META_recommended_layer_resolution
+    XR_META_spatial_entity_persistence XR_META_spatial_entity_discovery XR_META_boundary_visibility
+    XR_METAX1_face_tracking_visemes XR_META_headset_id XR_FB_composition_layer_settings
+    XR_META_automatic_layer_filter XR_EXT_future XR_META_recommended_layer_resolution
   company: Meta
   priority: 0
   required: 0
@@ -1594,10 +1593,9 @@ MonoBehaviour:
     XR_FB_hand_tracking_confidence XR_META_detached_controllers XR_LOGITECH_mx_ink_stylus_interaction
     XR_META_colocation_discovery XR_META_spatial_entity_sharing XR_META_spatial_entity_group_sharing
     XR_EXT_debug_utils XR_META_dynamic_object_tracker XR_META_dynamic_object_keyboard
-    XR_META_hand_tracking_microgestures XR_META_spatial_entity_persistence XR_META_spatial_entity_discovery
-    XR_META_boundary_visibility XR_METAX1_face_tracking_visemes XR_META_headset_id
-    XR_FB_composition_layer_settings XR_META_automatic_layer_filter XR_EXT_future
-    XR_META_recommended_layer_resolution
+    XR_META_spatial_entity_persistence XR_META_spatial_entity_discovery XR_META_boundary_visibility
+    XR_METAX1_face_tracking_visemes XR_META_headset_id XR_FB_composition_layer_settings
+    XR_META_automatic_layer_filter XR_EXT_future XR_META_recommended_layer_resolution
   company: Meta
   priority: 0
   required: 0
@@ -1684,7 +1682,7 @@ MonoBehaviour:
   - {fileID: 5702415269444764538}
   - {fileID: 2616350008879641615}
   - {fileID: 129566514250663481}
-  - {fileID: 1902203535387490821}
+  - {fileID: -8922549809904824292}
   - {fileID: 4364028759367114706}
   - {fileID: -981348741319963210}
   - {fileID: -5440409890741884406}
@@ -2215,7 +2213,7 @@ MonoBehaviour:
   - {fileID: -2041641316705638276}
   - {fileID: -4747877491223826637}
   - {fileID: -7151777732596396346}
-  - {fileID: -162847349764194904}
+  - {fileID: 3582570040310346410}
   - {fileID: 3969244271865394695}
   - {fileID: -1677224522410623940}
   - {fileID: 1258495764906114469}

@@ -47,7 +47,7 @@ public class AffirmationDisplay : MonoBehaviour, StepBehavior
     private void Awake()
     {
         // Hide initially
-        gameObject.SetActive(false);
+        //gameObject.SetActive(false);
     }
     
     /// <summary>
@@ -67,7 +67,7 @@ public class AffirmationDisplay : MonoBehaviour, StepBehavior
             return;
             
         isActive = true;
-        gameObject.SetActive(true);
+        //gameObject.SetActive(true);
         
         // Reset to first affirmation
         currentAffirmationIndex = -1;
@@ -91,26 +91,30 @@ public class AffirmationDisplay : MonoBehaviour, StepBehavior
         StartPulseEffect();
     }
     
-    /// <summary>
-    /// Stops the affirmation display
-    /// </summary>
+    // ADD this new method
+    public void StopStep()
+    {
+        Debug.Log("<color=red>AffirmationDisplay: StopStep() called by SessionController.</color>");
+        StopAffirmationDisplay();
+    }
+
+     // MODIFY StopAffirmationDisplay to ADD BACK SetActive(false)
     public void StopAffirmationDisplay()
     {
         if (!isActive)
-            return;
-            
+             return;
+
+        Debug.Log("<color=red>AffirmationDisplay: StopAffirmationDisplay() called.</color>");
         isActive = false;
-        
-        // Stop coroutines
-        if (displayCoroutine != null)
-        {
+
+        if (displayCoroutine != null) {
             StopCoroutine(displayCoroutine);
             displayCoroutine = null;
         }
-        
         StopPulseEffect();
-        
-        // Hide the display
+
+        // ADD THIS BACK - Hide the display
+        Debug.Log("<color=red>AffirmationDisplay: Setting GameObject Active = false in Stop function.</color>");
         gameObject.SetActive(false);
     }
     
