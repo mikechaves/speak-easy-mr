@@ -42,9 +42,9 @@ public class BreathingVisualizer : MonoBehaviour, StepBehavior
     // ADD Awake and Start for logging if they don't exist
     private void Awake()
     {
-        Debug.Log("<color=lightblue>BreathingVisualizer: Awake() called.</color>");
+        //Debug.Log("<color=lightblue>BreathingVisualizer: Awake() called.</color>");
         // Hide initially - This happens BEFORE Start can run
-        Debug.Log("<color=lightblue>BreathingVisualizer: Setting GameObject Active = false in Awake.</color>");
+        //Debug.Log("<color=lightblue>BreathingVisualizer: Setting GameObject Active = false in Awake.</color>");
         //gameObject.SetActive(false);
     }
 

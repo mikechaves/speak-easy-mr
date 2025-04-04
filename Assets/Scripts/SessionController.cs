@@ -58,6 +58,10 @@ public class SessionController : MonoBehaviour
     {
         return currentState;
     }
+    public int GetCurrentStepIndex()
+    {
+        return currentStepIndex; // Simply return the value of the private variable
+    }
     
     public void StartSession()
     {

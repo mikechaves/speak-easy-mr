@@ -22,15 +22,22 @@ MonoBehaviour:
     isPrivate: 0
     createdAt: 2025-03-10T11:55:03-0700
     trainingStatus: 1
-    lastTrainDuration: 54
-    lastTrainedAt: 2025-03-10T13:03:39-0700
-    nextTrainAt: 2025-03-10T13:02:45-0700
+    lastTrainDuration: 77
+    lastTrainedAt: 2025-04-03T21:27:49-0700
+    nextTrainAt: 2025-04-03T21:26:32-0700
     intents:
     - id: 606344952388920
       name: end_session
       entities:
       - name: therapy_command:therapy_command
         id: 1362160771905311
+    - id: 9436525979766371
+      name: modify_light
+      entities:
+      - name: intensity_direction:intensity_direction
+        id: 626131573568571
+      - name: light_color:light_color
+        id: 1164538794893732
     - id: 3505843262886564
       name: next_step
       entities:
@@ -42,6 +49,82 @@ MonoBehaviour:
       - name: therapy_command:therapy_command
         id: 1362160771905311
     entities:
+    - name: intensity_direction
+      id: 593767087025938
+      lookups:
+      - keywords
+      roles:
+      - name: intensity_direction
+        id: 626131573568571
+      keywords:
+      - keyword: brighter
+        synonyms:
+        - brighter
+        - increase
+        - increase the brightness
+        - make it brighter
+        - more
+        - up
+      - keyword: decrease
+        synonyms:
+        - decrease
+      - keyword: dim
+        synonyms:
+        - dim
+      - keyword: dimmer
+        synonyms:
+        - decrease
+        - decrease the light intensity
+        - dim
+        - dim the light
+        - dimmer
+        - down
+        - less
+        - make it dimmer
+      - keyword: increase
+        synonyms:
+        - increase
+    - name: light_color
+      id: 627672636847772
+      lookups:
+      - keywords
+      roles:
+      - name: light_color
+        id: 1164538794893732
+      keywords:
+      - keyword: blue
+        synonyms:
+        - blue
+        - make the light blue
+      - keyword: cool
+        synonyms:
+        - cool
+      - keyword: green
+        synonyms:
+        - change the light color to green
+        - green
+      - keyword: orange
+        synonyms:
+        - orange
+      - keyword: pink
+        synonyms:
+        - pink
+      - keyword: purple
+        synonyms:
+        - purple
+      - keyword: red
+        synonyms:
+        - red
+      - keyword: warm
+        synonyms:
+        - warm
+      - keyword: white
+        synonyms:
+        - set the color to warm white
+        - white
+      - keyword: yellow
+        synonyms:
+        - yellow
     - name: therapy_command
       id: 1316101902975364
       lookups:
@@ -50,6 +133,24 @@ MonoBehaviour:
       - name: therapy_command
         id: 1362160771905311
       keywords:
+      - keyword: Begin
+        synonyms:
+        - begin
+      - keyword: Begin session
+        synonyms:
+        - begin session
+      - keyword: End session
+        synonyms:
+        - end session
+      - keyword: Next
+        synonyms:
+        - next
+      - keyword: Next step
+        synonyms:
+        - next step
+      - keyword: Stop
+        synonyms:
+        - stop
       - keyword: continue
         synonyms:
         - continue

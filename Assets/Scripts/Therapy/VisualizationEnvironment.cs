@@ -132,6 +132,38 @@ public class VisualizationEnvironment : MonoBehaviour, StepBehavior
     /// <summary>
     /// Transitions the environment in with audio and visual fades
     /// </summary>
+    /// 
+    public void SetLightColor(Color newColor)
+    {
+        if (environmentLight != null)
+        {
+            Debug.Log($"<color=cyan>VisualizationEnvironment: Setting light color to {newColor}</color>");
+            environmentLight.color = newColor;
+        }
+        else
+        {
+            Debug.LogWarning("VisualizationEnvironment: Cannot set light color - environmentLight reference is missing.");
+        }
+    }
+
+    public void AdjustLightIntensity(float direction, float amount = 0.2f)
+    {
+        if (environmentLight != null)
+        {
+            float currentIntensity = environmentLight.intensity;
+            float normalizedDirection = Mathf.Sign(direction);
+            float change = amount * normalizedDirection;
+            float newIntensity = Mathf.Clamp(currentIntensity + change, 0f, 1.5f); // Allow going slightly above 1 if needed
+
+            Debug.Log($"<color=cyan>VisualizationEnvironment: Adjusting light intensity from {currentIntensity:F2} to {newIntensity:F2}</color>");
+            environmentLight.intensity = newIntensity;
+        }
+        else
+        {
+            Debug.LogWarning("VisualizationEnvironment: Cannot adjust light intensity - environmentLight reference is missing.");
+        }
+    }
+// --- End of methods to check/add ---
     private IEnumerator TransitionInRoutine()
     {
         // Start with low light

@@ -1,16 +1,13 @@
 using UnityEngine;
-using UnityEngine.Events; // Keep for potential UnityEvent usage if needed elsewhere
-using Meta.WitAi; // Keep for WitResponseNode if OnResponse still uses it
-using Meta.Voice; // Likely needed for AppVoiceExperience
-using Oculus.Voice;
-using Meta.WitAi.Json;
+using UnityEngine.Events;
+using Meta.WitAi; // Needed for VoiceService base? Check if still needed.
+using Meta.WitAi.Json; // Needed for WitResponseNode and direct access
+using Meta.Voice; // Needed for AppVoiceExperience? Check specific SDK version.
+using Oculus.Voice; // Needed for AppVoiceExperience based on earlier fix.
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
-
-// Ensure AppVoiceExperience type is accessible. You might need to add:
-// using Oculus.Voice; // If using older Oculus SDK integration namespace
+using System.Linq; // Used for ContainsAny optimization if added back
 
 public class VoiceCommandManager : MonoBehaviour
 {
@@ -21,35 +18,35 @@ public class VoiceCommandManager : MonoBehaviour
     [Tooltip("Check this to print additional diagnostic info")]
     [SerializeField] private bool verboseDiagnostics = true;
     [Tooltip("Set to lower value (0.5-0.7) if having trouble with command recognition")]
-    [SerializeField] private float matchThreshold = 0.65f;
+    [SerializeField] private float matchThreshold = 0.65f; // Note: Current ContainsAny doesn't use this; uses Levenshtein directly
 
     [Header("References")]
     [SerializeField] private SessionController sessionController;
     [SerializeField] private FeedbackManager feedbackManager;
 
     [Header("Command Settings")]
-    [SerializeField] private string[] startSessionCommands = { "start therapy", "begin session", "start", "begin", "therapy" };
-    [SerializeField] private string[] nextStepCommands = { "next step", "continue", "next", "go on", "proceed", "forward", "advance", "cont", "move on", "go ahead", "keep going" };
+    [SerializeField] private string[] startSessionCommands = { "start therapy", "begin session", "start", "begin", "therapy", "ready" }; // Added "ready" based on logs
+    [SerializeField] private string[] nextStepCommands = { "next step", "continue", "next", "go on", "proceed", "forward", "advance", "cont", "move on", "go ahead", "keep going", "okay", "ok" }; // Added okay/ok
     [SerializeField] private string[] endSessionCommands = { "end session", "stop therapy", "end", "stop", "finish", "exit", "quit" };
+
+    [Header("Step Behavior References")] // Optional header for organization
+    [SerializeField] private VisualizationEnvironment visualizationEnvironment;
+    // Add references to other behaviors here if needed for other custom commands later
 
     // Common mistaken transcriptions and their correct mappings
     private readonly Dictionary<string, string> commonMistranscriptions = new Dictionary<string, string>
     {
-        // "Continue" often gets transcribed as...
-        { "continue you", "continue" }, { "continued", "continue" }, { "can to you", "continue" },
-        { "container", "continue" }, { "continue on", "continue" }, { "continue new", "continue" },
-        { "continuing", "continue" }, { "continu", "continue" }, { "contenyu", "continue" },
-        { "can tea new", "continue" }, { "content", "continue" }, { "continual", "continue" },
-        { "continue to", "continue" }, { "continue the", "continue" }, { "continue a", "continue" },
-        { "continue please", "continue" }, { "continue now", "continue" }, { "continuous", "continue" },
         // "Next" often gets transcribed as...
         { "next up", "next" }, { "text", "next" }, { "nest", "next" }, { "necks", "next" },
         { "next to", "next" }, { "next please", "next" }, { "next one", "next" },
         { "next time", "next" }, { "next day", "next" },
+
         // "Begin" often gets transcribed as...
         { "began", "begin" }, { "beginning", "begin" }, { "begins", "begin" },
+
         // "Start" often gets transcribed as...
         { "started", "start" }, { "starting", "start" }, { "starts", "start" },
+
         // "End" often gets transcribed as...
         { "and", "end" }, { "ending", "end" }, { "ends", "end" }
     };
@@ -84,19 +81,17 @@ public class VoiceCommandManager : MonoBehaviour
             feedbackManager.UpdateStatusIndicator(false, "Incorrect voice service type");
             return;
         }
-        Debug.Log($"Voice service confirmed as AppVoiceExperience: {appVoiceExperience.name}");
+        if(verboseDiagnostics) Debug.Log($"Voice service confirmed as AppVoiceExperience: {appVoiceExperience.name}");
 
-        // --- Check Wit Configuration (Simplified) ---
-        // Basic check if the config asset is assigned on the AppVoiceExperience
-        // More detailed checks (like token) could be added if necessary, accessing appVoiceExperience.RuntimeConfiguration
-        if (appVoiceExperience.RuntimeConfiguration == null || string.IsNullOrEmpty(appVoiceExperience.RuntimeConfiguration.witConfiguration?.GetClientAccessToken())) // Use function call ()
+        // --- Check Wit Configuration ---
+        if (appVoiceExperience.RuntimeConfiguration == null || string.IsNullOrEmpty(appVoiceExperience.RuntimeConfiguration.witConfiguration?.GetClientAccessToken()))
         {
              Debug.LogError("Wit configuration asset or client access token might be missing on AppVoiceExperience!");
              feedbackManager.UpdateStatusIndicator(false, "Wit config/token error");
-             // Consider returning here if this is critical
+             // Consider returning here if critical
         }
         else {
-             Debug.Log("Found Wit configuration with token on AppVoiceExperience.");
+             if(verboseDiagnostics) Debug.Log("Found Wit configuration with token on AppVoiceExperience.");
         }
 
         // --- Setup Event Listeners ---
@@ -108,31 +103,29 @@ public class VoiceCommandManager : MonoBehaviour
 
         // --- Automatic Activation ---
         Debug.Log("Attempting to automatically activate voice recognition on start.");
-        // Consider using Voice Activity Detection (VAD) configured on the AppVoiceExperience component
-        // in the Inspector for a more robust hands-free experience, which might negate the need for this call.
         StartListening();
     }
 
     private void SetupTranscriptionEvents()
     {
-        if (appVoiceExperience == null) return; // Should have been caught in Start, but safety check
+        if (appVoiceExperience == null) return;
 
         try
         {
-            Debug.Log("Adding event listeners to AppVoiceExperience.VoiceEvents");
+            if(verboseDiagnostics) Debug.Log("Adding event listeners to AppVoiceExperience.VoiceEvents");
 
-            // Subscribe to the events provided by AppVoiceExperience
-            // **IMPORTANT**: Ensure these method signatures match YOUR SDK version!
-            appVoiceExperience.VoiceEvents.OnSend?.AddListener(OnSend); // Use OnSend
+            // Subscribe using the correct event properties exposed by AppVoiceExperience.VoiceEvents
+            // Ensure handler method signatures match your SDK version!
+            appVoiceExperience.VoiceEvents.OnSend?.AddListener(OnSend);
             appVoiceExperience.VoiceEvents.OnPartialTranscription?.AddListener(OnPartialTranscriptionReceived);
             appVoiceExperience.VoiceEvents.OnFullTranscription?.AddListener(OnFullTranscriptionReceived);
             appVoiceExperience.VoiceEvents.OnStartListening?.AddListener(OnStartListening);
             appVoiceExperience.VoiceEvents.OnStoppedListening?.AddListener(OnStoppedListening);
-            appVoiceExperience.VoiceEvents.OnError?.AddListener(OnError); // Signature might be different, e.g., (string code, string message)
-            appVoiceExperience.VoiceEvents.OnResponse?.AddListener(OnResponse); // Signature might be different, e.g., (WitResponseNode response)
-            appVoiceExperience.VoiceEvents.OnAborted?.AddListener(OnAborted); // Signature likely has no parameters
+            appVoiceExperience.VoiceEvents.OnError?.AddListener(OnError);
+            appVoiceExperience.VoiceEvents.OnResponse?.AddListener(OnResponse);
+            appVoiceExperience.VoiceEvents.OnAborted?.AddListener(OnAborted);
 
-            Debug.Log("Successfully added listeners (check handler signatures if issues arise).");
+            if(verboseDiagnostics) Debug.Log("Successfully added listeners.");
         }
         catch (Exception e)
         {
@@ -142,13 +135,13 @@ public class VoiceCommandManager : MonoBehaviour
 
     private void OnDisable()
     {
-        // Unsubscribe from events to prevent errors when the object is destroyed
+        // Unsubscribe from events
         if (appVoiceExperience != null && appVoiceExperience.VoiceEvents != null)
         {
             try
             {
-                 Debug.Log("Removing event listeners from AppVoiceExperience.VoiceEvents");
-                 appVoiceExperience.VoiceEvents.OnSend?.RemoveListener(OnSend); // Use OnSend
+                 if(verboseDiagnostics) Debug.Log("Removing event listeners from AppVoiceExperience.VoiceEvents");
+                 appVoiceExperience.VoiceEvents.OnSend?.RemoveListener(OnSend);
                  appVoiceExperience.VoiceEvents.OnPartialTranscription?.RemoveListener(OnPartialTranscriptionReceived);
                  appVoiceExperience.VoiceEvents.OnFullTranscription?.RemoveListener(OnFullTranscriptionReceived);
                  appVoiceExperience.VoiceEvents.OnStartListening?.RemoveListener(OnStartListening);
@@ -165,154 +158,200 @@ public class VoiceCommandManager : MonoBehaviour
     }
 
     // --- Event Handlers ---
-    // **IMPORTANT**: Verify the parameters match AppVoiceExperience.VoiceEvents in your SDK version!
 
-    // Delete this entire method
-    // private void OnRequestCreated(Meta.WitAi.Requests.VoiceServiceRequest request) {
-    //     // Optional: Log or handle when a new request begins processing
-    //     if(verboseDiagnostics) Debug.Log($"Voice Request Created: {request.Options?.RequestId}");
-    // }
-
-    // Handler for the OnSend event (replaces obsolete OnRequestCreated)
- // Verify signature if needed for your SDK version
     private void OnSend(Meta.WitAi.Requests.VoiceServiceRequest request)
     {
-        // Optional: Log or handle when a request is sent to Wit.ai
         if(verboseDiagnostics) Debug.Log($"Voice Request Sent: {request?.Options?.RequestId}");
     }
 
     private void OnStartListening()
     {
         isListening = true;
-        feedbackManager.UpdateStatusIndicator(true, "Listening...");
+        feedbackManager?.UpdateStatusIndicator(true, "Listening...");
         if(verboseDiagnostics) Debug.Log("Event: Started listening for voice commands");
     }
 
     private void OnStoppedListening()
     {
         isListening = false;
-        feedbackManager.UpdateStatusIndicator(false, "Processing...");
+        feedbackManager?.UpdateStatusIndicator(false, "Processing...");
          if(verboseDiagnostics) Debug.Log("Event: Stopped listening for voice commands");
     }
 
-     // Verify signature: Might be (string code, string message) or just (string error) etc.
+    // Ensure signature (string code, string message) matches your SDK's VoiceEvents.OnError
     private void OnError(string code, string message)
     {
         Debug.LogError($"Event: Voice recognition error: {code} - {message}");
         isListening = false; // Ensure state is correct
-        feedbackManager.UpdateStatusIndicator(false, "Error: " + message);
-        feedbackManager.PlayErrorFeedback("Voice recognition error. Please try again.");
+        feedbackManager?.UpdateStatusIndicator(false, "Error: " + message);
+        feedbackManager?.PlayErrorFeedback("Voice recognition error. Please try again.");
 
-        // Optional: Auto-restart listening after an error if in an active session
         if (sessionController != null && sessionController.GetCurrentState() == SessionState.Active)
         {
             Debug.Log("In active session - attempting auto-restart after error");
-            // Add a small delay before restarting
             StartCoroutine(RestartListeningAfterDelay(2.0f));
         }
     }
 
-     // Verify signature: Does it still provide WitResponseNode or something else?
+    // This method now primarily handles SPECIFIC intents or early responses.
+    // Transcript processing for navigation is done in OnFullTranscriptionReceived.
     private void OnResponse(WitResponseNode response)
     {
-         if(verboseDiagnostics) Debug.Log("Event: Response received from voice service");
-         if (response == null) {
-             Debug.LogWarning("OnResponse received a null response node.");
-             HandleLowConfidence();
-             return;
-         }
+        if (response == null) {
+            Debug.LogWarning("OnResponse called with null response node.");
+            HandleLowConfidence(); // Assume low confidence if response is null
+            return;
+        }
 
-        try
+        if(verboseDiagnostics) Debug.Log($"FULL RESPONSE NODE: {response.ToString()}");
+
+        bool processedIntentInResponse = false; // Flag if we handled a specific intent HERE
+
+        // --- Check for Visualization Step Specific Commands ---
+        int visualizationStepIndex = 2; // Make sure this index matches your SessionController setup
+        bool isVisualizationStepActive = sessionController != null &&
+                                         sessionController.GetCurrentState() == SessionState.Active &&
+                                         sessionController.GetCurrentStepIndex() == visualizationStepIndex;
+
+        if (isVisualizationStepActive)
         {
-            if(verboseDiagnostics) Debug.Log($"FULL RESPONSE NODE: {response.ToString()}");
-
-            // Fallback: If OnFullTranscription isn't reliable, try extracting from OnResponse
-            string transcript = response["text"]?.Value; // Common location
-            if (string.IsNullOrEmpty(transcript)) {
-                transcript = response["transcript"]?.Value; // Alternative
+            // Access Intents using JSON-style indexing
+            string intentName = null;
+            float intentConfidence = 0f;
+            try {
+                if (response["intents"] != null && response["intents"].Count > 0) {
+                    intentName = response["intents"][0]["name"]?.Value;
+                    intentConfidence = response["intents"][0]["confidence"]?.AsFloat ?? 0f;
+                    if(verboseDiagnostics && !string.IsNullOrEmpty(intentName)) Debug.Log($"Intent Detected: {intentName} (Confidence: {intentConfidence:F2})");
+                }
+            } catch (Exception e) {
+                Debug.LogWarning($"Error accessing intents: {e.Message}");
             }
-             if (string.IsNullOrEmpty(transcript)) {
-                 // Check for intents if transcript is missing (like in original code)
-                 if (response["intents"] != null && response["intents"].Count > 0)
-                 {
-                     string intentName = response["intents"][0]["name"]?.Value;
-                     float intentConfidence = response["intents"][0]["confidence"]?.AsFloat ?? 0f;
-                     Debug.Log($"Detected intent via OnResponse: {intentName} (confidence: {intentConfidence})");
-                     // You might add intent-based handling here if needed
+
+            // Check for modify_light intent
+            if (!string.IsNullOrEmpty(intentName) && intentName.Equals("modify_light", StringComparison.OrdinalIgnoreCase) && intentConfidence > 0.7f)
+            {
+                 if (visualizationEnvironment == null) {
+                     Debug.LogError("Detected modify_light intent but VisualizationEnvironment reference is missing!");
+                 } else {
+                    bool actionTaken = false;
+                     // Access Entities using JSON-style indexing
+                     string colorEntityKey = "light_color:light_color"; // Use the exact name from Wit.ai
+                     string intensityEntityKey = "intensity_direction:intensity_direction"; // Use the exact name from Wit.ai
+                     try {
+                         // Check for color entity
+                         if (response["entities"] != null && response["entities"][colorEntityKey] != null && response["entities"][colorEntityKey].Count > 0) {
+                             string colorName = response["entities"][colorEntityKey][0]["value"]?.Value;
+                             if (!string.IsNullOrEmpty(colorName)) {
+                                 Debug.Log($"Extracted color entity value: {colorName}");
+                                 Color targetColor = ParseColor(colorName);
+                                 visualizationEnvironment.SetLightColor(targetColor);
+                                 feedbackManager?.PlaySuccessFeedback($"Light color set to {colorName}");
+                                 actionTaken = true;
+                             }
+                         }
+                         // Check for intensity direction entity
+                         if (response["entities"] != null && response["entities"][intensityEntityKey] != null && response["entities"][intensityEntityKey].Count > 0) {
+                             string direction = response["entities"][intensityEntityKey][0]["value"]?.Value;
+                             if (!string.IsNullOrEmpty(direction)) {
+                                 Debug.Log($"Extracted intensity direction entity value: {direction}");
+                                 if (direction.Equals("brighter", StringComparison.OrdinalIgnoreCase)) {
+                                     visualizationEnvironment.AdjustLightIntensity(1.0f);
+                                     feedbackManager?.PlaySuccessFeedback("Light brighter");
+                                     actionTaken = true;
+                                 } else if (direction.Equals("dimmer", StringComparison.OrdinalIgnoreCase)) {
+                                     visualizationEnvironment.AdjustLightIntensity(-1.0f);
+                                     feedbackManager?.PlaySuccessFeedback("Light dimmer");
+                                     actionTaken = true;
+                                 }
+                             }
+                         }
+                     } catch (Exception e) {
+                          Debug.LogWarning($"Error accessing entities for modify_light: {e.Message}");
+                     }
+
+                     if (actionTaken) {
+                        processedIntentInResponse = true; // Mark intent processed
+                        if (!isListening) StartCoroutine(RestartListeningAfterDelay(1.0f)); // Restart listener
+                     }
                  }
-             }
+                 // Mark as processed even if reference was missing or no entities found, to prevent fall-through
+                 processedIntentInResponse = true;
+            }
+        } // End of visualization step check
 
-            // If we got a transcript here AND OnFullTranscription isn't firing, process it.
-            // Avoid double-processing if OnFullTranscription works.
-            // For now, let's assume OnFullTranscription is the primary handler.
-            // If OnFullTranscriptionReceived doesn't get called, uncomment the next line:
-            // ProcessTranscript(transcript);
-
-        }
-        catch (Exception e)
+        // --- Handle cases where NO specific intent was processed ---
+        // If we didn't handle an intent here, AND we also failed to get a transcript later
+        // in OnFullTranscriptionReceived, THEN maybe flag low confidence.
+        // No call to ProcessTranscript here.
+        if (!processedIntentInResponse)
         {
-            Debug.LogError($"Error processing response node: {e.Message}");
-            HandleLowConfidence();
+            string transcript = response["text"]?.Value ?? response["_text"]?.Value; // Check if transcript exists for logging
+            if (string.IsNullOrEmpty(transcript) && verboseDiagnostics) {
+                 Debug.Log("OnResponse: No specific intent processed in this handler and no transcript found in typical fields (will rely on OnFullTranscriptionReceived).");
+                 // Only call HandleLowConfidence if OnFullTranscriptionReceived ALSO doesn't get a transcript?
+                 // Might be safer to let OnFullTranscriptionReceived handle it.
+            } else if (verboseDiagnostics) {
+                 Debug.Log($"OnResponse: No specific intent processed. Transcript '{transcript}' should be handled by OnFullTranscriptionReceived.");
+            }
         }
-
-        // Optional: Restart listening after processing if needed, handled by OnStoppedListening + auto-restart logic for now
     }
 
-
-    // Updated OnFullTranscriptionReceived with explicit StopListening call before restart
+    // This method handles the FINAL transcription and processes navigation commands.
     private void OnFullTranscriptionReceived(string transcript)
     {
+        // Log even if transcript is empty, helps debugging
         Debug.Log($"****** OnFullTranscriptionReceived FIRED with transcript: '{transcript}' ******");
         if(verboseDiagnostics) Debug.Log($"Event: Full transcription received: '{transcript}'");
 
-        // Process the transcript and check if a command was actually handled
-        bool commandProcessedSuccessfully = ProcessTranscript(transcript);
-
-        SessionState stateAfterProcessing = sessionController != null ? sessionController.GetCurrentState() : SessionState.Idle;
-        // Log state *before* potential StopListening call might change isListening flag
-        Debug.Log($"<color=#FFBF00>OnFullTranscriptionReceived: State after processing='{stateAfterProcessing}', isListening flag (before check)='{isListening}'</color>");
-
-        // --- Revised Restart Logic ---
-        // If a command WAS successfully processed AND the session should continue (is Active),
-        // ensure we stop first, then schedule a restart.
-        if (commandProcessedSuccessfully && stateAfterProcessing == SessionState.Active)
+        // Only process if we actually got some text
+        if (!string.IsNullOrEmpty(transcript))
         {
-            Debug.Log("<color=magenta>Command processed & session active. Explicitly calling StopListening() before scheduling restart.</color>");
-            StopListening(); // Ensure listener is stopped and isListening flag becomes false
+            // Process the transcript for navigation commands (Start, Next, End)
+            bool commandProcessedSuccessfully = ProcessTranscript(transcript);
 
-            // Now that we are sure listening is stopped, schedule the restart
-            Debug.Log("<color=green>Scheduling listener restart via coroutine...</color>");
-            StartCoroutine(RestartListeningAfterDelay(0.5f)); // Short delay
+            SessionState stateAfterProcessing = sessionController != null ? sessionController.GetCurrentState() : SessionState.Idle;
+            Debug.Log($"<color=#FFBF00>OnFullTranscriptionReceived: State after processing='{stateAfterProcessing}', isListening flag (before check)='{isListening}'</color>");
+
+            // --- Restart Logic ---
+            if (commandProcessedSuccessfully && stateAfterProcessing == SessionState.Active)
+            {
+                Debug.Log("<color=magenta>Command processed & session active. Explicitly calling StopListening() before scheduling restart.</color>");
+                StopListening();
+                Debug.Log("<color=green>Scheduling listener restart via coroutine...</color>");
+                StartCoroutine(RestartListeningAfterDelay(0.5f)); // Short delay seems okay now
+            }
+            else
+            {
+                 if (!commandProcessedSuccessfully) Debug.LogWarning("<color=orange>OnFullTranscriptionReceived: Not restarting (command not processed successfully).</color>");
+                 else if (stateAfterProcessing != SessionState.Active) Debug.LogWarning($"<color=orange>OnFullTranscriptionReceived: Not restarting (session not Active, state={stateAfterProcessing}).</color>");
+            }
         }
         else
         {
-             // Log why we are not restarting
-             if (!commandProcessedSuccessfully) Debug.LogWarning("<color=orange>OnFullTranscriptionReceived: Not restarting (command not processed successfully).</color>");
-             else if (stateAfterProcessing != SessionState.Active) Debug.LogWarning($"<color=orange>OnFullTranscriptionReceived: Not restarting (session not Active, state={stateAfterProcessing}).</color>");
-             // If command was processed but session ended, we don't restart.
+             // If OnFullTranscription itself received an empty transcript, treat as low confidence
+             Debug.LogWarning("OnFullTranscriptionReceived: Received empty transcript.");
+             HandleLowConfidence();
         }
     }
 
     private void OnPartialTranscriptionReceived(string transcript)
     {
         if(verboseDiagnostics) Debug.Log($"Event: Partial transcription: '{transcript}'");
-        // Inside VoiceCommandManager.cs, within OnPartialTranscriptReceived method
-        // feedbackManager?.UpdatePartialTranscript(transcript); // Temporarily disabled
+        // feedbackManager?.UpdatePartialTranscript(transcript); // Disabled based on previous steps
     }
 
-    // Verify signature: Likely has no parameters
     private void OnAborted()
     {
-         if(verboseDiagnostics) Debug.Log("Event: Voice recognition aborted");
-         isListening = false; // Ensure state is correct
-         feedbackManager.UpdateStatusIndicator(false, "Voice recognition ready");
+        if(verboseDiagnostics) Debug.Log("Event: Voice recognition aborted");
+        isListening = false;
+        feedbackManager?.UpdateStatusIndicator(false, "Voice recognition ready");
 
-         // Optional: Auto-restart listening after abort if in an active session
-         if (sessionController != null && sessionController.GetCurrentState() == SessionState.Active)
-         {
-             Debug.Log("In active session - attempting auto-restart after abort");
-             StartCoroutine(RestartListeningAfterDelay(2.0f));
-         }
+        if (sessionController != null && sessionController.GetCurrentState() == SessionState.Active)
+        {
+            Debug.Log("In active session - attempting auto-restart after abort");
+            StartCoroutine(RestartListeningAfterDelay(2.0f));
+        }
     }
 
 
@@ -321,23 +360,23 @@ public class VoiceCommandManager : MonoBehaviour
     // Returns true if a command was successfully matched and processed, false otherwise.
     private bool ProcessTranscript(string transcript)
     {
+        // This null/empty check should technically be redundant now if called only from OnFullTranscriptionReceived
+        // But keep it for safety.
         if (string.IsNullOrEmpty(transcript))
         {
             if(verboseDiagnostics) Debug.LogWarning("ProcessTranscript called with empty transcript.");
-            HandleLowConfidence();
-            return false; // No command processed
+            // HandleLowConfidence(); // Avoid calling HandleLowConfidence twice if OnFullTranscriptionReceived already did
+            return false;
         }
 
         string lowerTranscript = transcript.ToLower();
         SessionState currentState = sessionController.GetCurrentState();
         string correctedTranscript = ApplyTranscriptionCorrections(lowerTranscript);
-        bool commandMatched = false; // Flag to track if we processed a command
+        bool commandMatched = false;
 
         if (verboseDiagnostics && lowerTranscript != correctedTranscript) {
              Debug.Log($"Corrected transcript: '{lowerTranscript}' -> '{correctedTranscript}'");
         }
-
-        // Log analysis details
         if (verboseDiagnostics) {
             Debug.Log("---COMMAND DETECTION ANALYSIS---");
             Debug.Log($"Original: '{transcript}'");
@@ -345,46 +384,50 @@ public class VoiceCommandManager : MonoBehaviour
             Debug.Log($"Current Session State: {currentState}");
         }
 
-        // Prioritize based on state
+        // Prioritize based on state - Check for continue/next first if active
         if (currentState == SessionState.Active && IsPotentialContinueCommand(correctedTranscript)) {
              if (verboseDiagnostics) Debug.Log($"PRIORITY CONTINUE COMMAND DETECTED: '{correctedTranscript}'");
              sessionController.AdvanceToNextStep();
-             feedbackManager.PlaySuccessFeedback("Moving to next step");
-             commandMatched = true; // Command processed
+             feedbackManager?.PlaySuccessFeedback("Moving to next step");
+             commandMatched = true;
         }
+        // Check for start only if idle
         else if (currentState == SessionState.Idle && IsPotentialStartCommand(correctedTranscript)) {
              if (verboseDiagnostics) Debug.Log($"PRIORITY START COMMAND DETECTED: '{correctedTranscript}'");
              sessionController.StartSession();
-             feedbackManager.PlaySuccessFeedback("Session started");
-             commandMatched = true; // Command processed
+             feedbackManager?.PlaySuccessFeedback("Session started");
+             commandMatched = true;
         }
-        else {
-             // General matching if priority didn't hit
-             if (ContainsAny(correctedTranscript, startSessionCommands)) {
-                 Debug.Log($"COMMAND DETECTED: START SESSION - '{correctedTranscript}'");
+        // Check for end session
+        else if (ContainsAny(correctedTranscript, endSessionCommands)) {
+             Debug.Log($"COMMAND DETECTED: END SESSION - '{correctedTranscript}'");
+             sessionController.EndSession();
+             feedbackManager?.PlaySuccessFeedback("Session completed");
+             commandMatched = true;
+        }
+        // Fallback checks if specific priorities didn't match
+        else if (!commandMatched) // Only check these if no priority match occurred
+        {
+             // Check start commands again (covers cases like "start" said during Active state, which should maybe do nothing or give feedback)
+             if (currentState == SessionState.Idle && ContainsAny(correctedTranscript, startSessionCommands)) {
+                 Debug.Log($"COMMAND DETECTED: START SESSION (Fallback) - '{correctedTranscript}'");
                  sessionController.StartSession();
-                 feedbackManager.PlaySuccessFeedback("Session started");
-                 commandMatched = true; // Command processed
+                 feedbackManager?.PlaySuccessFeedback("Session started");
+                 commandMatched = true;
              }
-             else if (ContainsAny(correctedTranscript, nextStepCommands)) {
-                 Debug.Log($"COMMAND DETECTED: NEXT STEP - '{correctedTranscript}'");
+             // Check next commands again (covers cases where IsPotentialContinueCommand was too broad/narrow)
+             else if (currentState == SessionState.Active && ContainsAny(correctedTranscript, nextStepCommands)) {
+                 Debug.Log($"COMMAND DETECTED: NEXT STEP (Fallback) - '{correctedTranscript}'");
                  sessionController.AdvanceToNextStep();
-                 feedbackManager.PlaySuccessFeedback("Moving to next step");
-                 commandMatched = true; // Command processed
+                 feedbackManager?.PlaySuccessFeedback("Moving to next step");
+                 commandMatched = true;
              }
-             else if (ContainsAny(correctedTranscript, endSessionCommands)) {
-                 Debug.Log($"COMMAND DETECTED: END SESSION - '{correctedTranscript}'");
-                 sessionController.EndSession();
-                 feedbackManager.PlaySuccessFeedback("Session completed");
-                 commandMatched = true; // Command processed
-             }
-             // Last resort matching for common words during active session
-             else if (currentState == SessionState.Active && IsLastResortContinueWord(correctedTranscript))
-             {
+             // Last resort simple words for continue
+             else if (currentState == SessionState.Active && IsLastResortContinueWord(correctedTranscript)) {
                  Debug.Log($"LAST RESORT CONTINUE MATCH: '{correctedTranscript}'");
                  sessionController.AdvanceToNextStep();
-                 feedbackManager.PlaySuccessFeedback("Moving to next step");
-                 commandMatched = true; // Command processed
+                 feedbackManager?.PlaySuccessFeedback("Moving to next step");
+                 commandMatched = true;
              }
         }
 
@@ -396,37 +439,37 @@ public class VoiceCommandManager : MonoBehaviour
         if (!commandMatched)
         {
             Debug.Log($"NO COMMAND MATCH: '{correctedTranscript}'");
-            feedbackManager.PlayErrorFeedback("I didn't understand that command");
+            feedbackManager?.PlayErrorFeedback("I didn't understand that command");
             SuggestAlternativeCommands();
-            // HandleLowConfidence(); // Decide if no match should trigger retry logic
+            // HandleLowConfidence might be called by OnFullTranscriptionReceived if transcript was empty, avoid calling twice.
         }
 
-        return commandMatched; // Return true if we matched and processed a command
+        return commandMatched;
     }
 
     // Helper for priority check
     private bool IsPotentialContinueCommand(string correctedTranscript) {
-        return correctedTranscript.Contains("cont") || correctedTranscript.Contains("next") ||
-               correctedTranscript.Contains("go") || correctedTranscript.Contains("step") ||
-               correctedTranscript.Contains("move") || correctedTranscript.Contains("forward") ||
-               correctedTranscript.Contains("proceed");
+        // More specific check for common single words
+        if (correctedTranscript == "next" || correctedTranscript == "continue" || correctedTranscript == "okay" || correctedTranscript == "ok") return true;
+        // Check for phrases containing key indicators
+        return correctedTranscript.Contains("next step") || correctedTranscript.Contains("go on") ||
+               correctedTranscript.Contains("proceed") || correctedTranscript.Contains("move on") ||
+               correctedTranscript.Contains("go ahead");
     }
 
     // Helper for priority check
     private bool IsPotentialStartCommand(string correctedTranscript) {
-        return correctedTranscript.Contains("start") || correctedTranscript.Contains("begin") ||
-               correctedTranscript.Contains("therapy");
+         if (correctedTranscript == "start" || correctedTranscript == "begin" || correctedTranscript == "ready") return true;
+        return correctedTranscript.Contains("start therapy") || correctedTranscript.Contains("begin session");
     }
 
-     // Helper for last resort check
+    // Helper for last resort check - maybe remove if priority/ContainsAny are sufficient
     private bool IsLastResortContinueWord(string correctedTranscript) {
         string[] words = correctedTranscript.Split(new char[] { ' ', ',', '.', '!', '?' }, StringSplitOptions.RemoveEmptyEntries);
         foreach (string word in words)
         {
-            if (word.Equals("yes") || word.Equals("yeah") || word.Equals("ok") ||
-                word.Equals("okay") || word.Equals("fine") || word.Equals("sure") ||
-                word.Equals("alright") || word.Equals("continue") || word.Equals("next") ||
-                word.StartsWith("cont") || word.StartsWith("next") || word.StartsWith("mov"))
+            // Simplified - rely on nextStepCommands array mostly
+            if (word.Equals("yes") || word.Equals("yeah") || word.Equals("fine") || word.Equals("sure") || word.Equals("alright"))
             {
                 return true;
             }
@@ -437,77 +480,31 @@ public class VoiceCommandManager : MonoBehaviour
     private string ApplyTranscriptionCorrections(string transcript)
     {
         if (string.IsNullOrEmpty(transcript)) return transcript;
-
         string lowerTranscript = transcript.ToLower();
-        bool correctionApplied = false;
-
-        // Check exact mistranscription dictionary
+        // Simple dictionary lookup/replace
         foreach (var kvp in commonMistranscriptions) {
-            if (lowerTranscript.Contains(kvp.Key)) {
+            if (lowerTranscript.Contains(kvp.Key)) { // Basic check, could be more robust
                 lowerTranscript = lowerTranscript.Replace(kvp.Key, kvp.Value);
-                correctionApplied = true;
                 if (verboseDiagnostics) Debug.Log($"Applied correction: '{kvp.Key}' -> '{kvp.Value}'");
+                // Consider breaking after first match if appropriate
             }
         }
-
-        // Aggressive fuzzy matching for "continue" / "next" if no dictionary match found
-        if (!correctionApplied && (lowerTranscript.Contains("con") || lowerTranscript.Contains("can") || lowerTranscript.Contains("tin") || lowerTranscript.Contains("nex")))
-        {
-            float continueScore = CalculateSimilarity(lowerTranscript, "continue");
-            float nextScore = CalculateSimilarity(lowerTranscript, "next");
-
-            if (continueScore > 0.4f) {
-                 if (verboseDiagnostics) Debug.Log($"Special continue correction applied (score {continueScore:F2}) to: '{transcript}' -> 'continue'");
-                 return "continue"; // Return corrected directly
-            } else if (nextScore > 0.4f) {
-                 if (verboseDiagnostics) Debug.Log($"Special next correction applied (score {nextScore:F2}) to: '{transcript}' -> 'next'");
-                 return "next"; // Return corrected directly
-            }
-        }
-
-        return lowerTranscript; // Return potentially corrected transcript
+        // Removed fuzzy matching for simplicity/performance unless specifically needed
+        return lowerTranscript;
     }
 
     private bool ContainsAny(string source, string[] keywords)
     {
-        if (string.IsNullOrEmpty(source) || keywords == null || keywords.Length == 0) {
-            return false;
-        }
-
-        // Prepare source: lowercase, no punctuation, padded with spaces for word boundary checks
-        source = " " + source.ToLower().Replace(".", "").Replace(",", "").Replace("!", "").Replace("?", "") + " ";
-
-        foreach (string keyword in keywords)
-        {
+        if (string.IsNullOrEmpty(source) || keywords == null || keywords.Length == 0) return false;
+        // Use word boundary check for more accuracy
+        // Regex might be more robust: System.Text.RegularExpressions.Regex.IsMatch(source, $@"\b({string.Join("|", keywords.Select(k => System.Text.RegularExpressions.Regex.Escape(k)))})\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        string paddedSource = " " + source.ToLower().Replace(".", "").Replace(",", "").Replace("!", "").Replace("?", "") + " ";
+        foreach (string keyword in keywords) {
             if (string.IsNullOrEmpty(keyword)) continue;
-
-            string lowerKeyword = keyword.ToLower();
-            string spacedKeyword = " " + lowerKeyword + " ";
-
-            // Check for whole word match using padding
-            if (source.Contains(spacedKeyword)) {
+            string spacedKeyword = " " + keyword.ToLower() + " ";
+            if (paddedSource.Contains(spacedKeyword)) {
                 return true;
             }
-
-            // Simple contains check (less precise, might match substrings)
-            // if (source.Contains(lowerKeyword)) {
-            //     return true;
-            // }
-
-             // Optional: Fuzzy matching using Levenshtein (can be slow if used heavily)
-            /*
-             string[] words = source.Trim().Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-             foreach (string word in words)
-             {
-                 if (word.Length > 3 && lowerKeyword.Length > 3) {
-                     float similarity = CalculateSimilarity(word, lowerKeyword);
-                     if (similarity >= matchThreshold) {
-                         if (verboseDiagnostics) Debug.Log($"Fuzzy match: '{word}' similar to '{lowerKeyword}' (sim: {similarity:F2})");
-                         return true;
-                     }
-                 }
-             }
-            */
         }
         return false;
     }
@@ -517,144 +514,119 @@ public class VoiceCommandManager : MonoBehaviour
 
     public void StartListening()
     {
-        if (appVoiceExperience == null) {
-            Debug.LogError("Cannot start listening, AppVoiceExperience is not set.");
-            return;
-        }
+        if (appVoiceExperience == null) { Debug.LogError("Cannot start listening, AppVoiceExperience is not set."); return; }
 
-        // ADDED LOGS: Check state *before* the main condition
-        // Use Rich Text tags for emphasis
-        Debug.Log($"<color=yellow>StartListening Check: Current isListening flag = {isListening}</color>");
-        bool isActive = false;
-        try {
-            isActive = appVoiceExperience.Active; // Get the state safely
-        } catch (Exception e) {
-            Debug.LogError($"<color=red>StartListening Check: Error accessing appVoiceExperience.Active: {e.Message}</color>");
-        }
-        Debug.Log($"<color=yellow>StartListening Check: Current appVoiceExperience.Active = {isActive}</color>");
+        if (verboseDiagnostics) Debug.Log($"<color=yellow>StartListening Check: Current isListening flag = {isListening}, AppVoiceExperience.Active = {appVoiceExperience.Active}</color>");
 
-        // Don't try to activate if already listening or if service reports active
-        if (!isListening && !isActive) // Use the safely obtained 'isActive' value
+        if (!isListening && !appVoiceExperience.Active)
         {
-            Debug.Log("<color=green>Condition Met: Attempting to Activate voice service...</color>");
+            if(verboseDiagnostics) Debug.Log("<color=green>Condition Met: Attempting to Activate voice service...</color>");
             try
             {
-                // ADDED LOGS: Check token access result more carefully
                 var runtimeConfig = appVoiceExperience.RuntimeConfiguration;
                 var witConfig = runtimeConfig?.witConfiguration;
-                string token = null; // Default to null
-                if (witConfig != null) {
-                    try {
-                        token = witConfig.GetClientAccessToken();
-                    } catch (Exception e) {
-                        Debug.LogError($"<color=red>Token Check: Error calling GetClientAccessToken(): {e.Message}</color>");
-                    }
-                }
-                Debug.Log($"<color=cyan>Token Check: runtimeConfig null? {runtimeConfig == null}</color>");
-                Debug.Log($"<color=cyan>Token Check: witConfig null? {witConfig == null}</color>");
-                bool isTokenNullOrEmpty = string.IsNullOrEmpty(token);
-                Debug.Log($"<color=cyan>Token Check: token is null or empty? {isTokenNullOrEmpty}</color>");
-
-                // Ensure configuration is still valid (basic check)
-                if (runtimeConfig == null || isTokenNullOrEmpty) {
+                string token = witConfig?.GetClientAccessToken();
+                if (runtimeConfig == null || string.IsNullOrEmpty(token)) {
                     Debug.LogError("<color=red>Cannot Activate: Wit configuration or token missing/invalid.</color>");
                     feedbackManager?.UpdateStatusIndicator(false, "Config/Token Error");
-                    return; // Exit if token is invalid
+                    return;
                 }
-
-                Debug.Log("<color=lime>Calling appVoiceExperience.Activate()...</color>");
+                if(verboseDiagnostics) Debug.Log("<color=lime>Calling appVoiceExperience.Activate()...</color>");
                 appVoiceExperience.Activate();
-                // OnStartListening event should update isListening and UI
             }
-            catch (Exception e)
-            {
-                Debug.LogError($"<color=red>Error during appVoiceExperience.Activate(): {e.Message}\n{e.StackTrace}</color>"); // Added StackTrace
-                isListening = false; // Ensure state is false on error
+            catch (Exception e) {
+                Debug.LogError($"<color=red>Error during appVoiceExperience.Activate(): {e.Message}\n{e.StackTrace}</color>");
+                isListening = false;
                 feedbackManager?.UpdateStatusIndicator(false, "Error activating");
             }
         } else {
-            // Log why the condition failed
-            string reason = "";
-            if (isListening) reason += "isListening=true; ";
-            if (isActive) reason += "appVoiceExperience.Active=true; ";
-            Debug.LogWarning($"<color=orange>Condition NOT Met for Activation: {reason}Skipping Activate call.</color>");
-            // If already active, maybe just ensure our flag matches?
-            if (isActive && !isListening) {
-                Debug.LogWarning("<color=orange>Service is active but flag is false. Updating flag via OnStartListening event hopefully.</color>");
-                // Optionally force flag sync, but event *should* handle this if it fires
-                // isListening = true;
-                // feedbackManager?.UpdateStatusIndicator(true, "Listening (already active)");
-            }
+             string reason = (isListening ? "isListening=true; " : "") + (appVoiceExperience.Active ? "appVoiceExperience.Active=true; " : "");
+             if(verboseDiagnostics) Debug.LogWarning($"<color=orange>Condition NOT Met for Activation: {reason}Skipping Activate call.</color>");
+             if (appVoiceExperience.Active && !isListening) {
+                 if(verboseDiagnostics) Debug.LogWarning("<color=orange>Service is active but flag is false. Relying on OnStartListening event.</color>");
+             }
         }
     }
     public void StopListening()
     {
          if (appVoiceExperience == null) return;
-
-        // Only deactivate if we think we are listening or if service reports active
-        if (isListening || appVoiceExperience.Active)
-        {
+         if (isListening || appVoiceExperience.Active) {
              if(verboseDiagnostics) Debug.Log("Deactivating voice service...");
-             try {
-                appVoiceExperience.Deactivate();
-                // OnStoppedListening event should update isListening and UI
-             } catch (Exception e) {
+             try { appVoiceExperience.Deactivate(); }
+             catch (Exception e) {
                 Debug.LogError($"Error deactivating voice service: {e.Message}");
                 isListening = false; // Force state update on error
                 feedbackManager?.UpdateStatusIndicator(false, "Error stopping");
              }
-        } else {
-             if(verboseDiagnostics) Debug.Log("StopListening called but service was not active/listening.");
-        }
+         } else {
+              if(verboseDiagnostics) Debug.Log("StopListening called but service was not active/listening.");
+         }
     }
 
     private void HandleLowConfidence()
     {
         retryCount++;
         Debug.Log($"Low confidence or empty transcript. Retry count: {retryCount}/{MAX_RETRIES}");
-
         if (retryCount >= MAX_RETRIES) {
-            feedbackManager.PlayErrorFeedback("I'm still having trouble understanding. Please check commands or try again.");
+            feedbackManager?.PlayErrorFeedback("I'm still having trouble understanding.");
             SuggestAlternativeCommands();
-            retryCount = 0; // Reset after max retries
+            retryCount = 0;
         } else {
-            feedbackManager.PlayErrorFeedback("I'm not sure I understood. Could you repeat that?");
-            // Don't automatically StartListening here, let the error/abort handlers manage restart if needed
+            feedbackManager?.PlayErrorFeedback("I didn't quite catch that. Could you repeat?");
+            // Consider if we should auto-restart listening here
+             if (sessionController != null && sessionController.GetCurrentState() == SessionState.Active && !isListening) {
+                 StartCoroutine(RestartListeningAfterDelay(0.5f)); // Quick restart after asking to repeat
+             }
         }
     }
 
     private IEnumerator RestartListeningAfterDelay(float delay)
     {
-        Debug.Log($"<color=#00FFFF>RestartListeningAfterDelay: Coroutine started. Waiting for {delay}s...</color>"); // Changed Color
+        if(verboseDiagnostics) Debug.Log($"<color=#00FFFF>RestartListeningAfterDelay: Coroutine started. Waiting for {delay}s...</color>");
         yield return new WaitForSeconds(delay);
-        Debug.Log("<color=#00FFFF>RestartListeningAfterDelay: Wait finished.</color>"); // Changed Color
+        if(verboseDiagnostics) Debug.Log("<color=#00FFFF>RestartListeningAfterDelay: Wait finished.</color>");
 
-        // Check if we should restart (e.g., still in active session)
-        SessionState currentState = sessionController != null ? sessionController.GetCurrentState() : SessionState.Idle; // Get state *now*
-        Debug.Log($"<color=#00FFFF>RestartListeningAfterDelay: Checking session state. Current State = {currentState}</color>"); // ADDED
+        SessionState currentState = sessionController != null ? sessionController.GetCurrentState() : SessionState.Idle;
+        if(verboseDiagnostics) Debug.Log($"<color=#00FFFF>RestartListeningAfterDelay: Checking session state. Current State = {currentState}</color>");
 
         if (currentState == SessionState.Active) {
-            Debug.Log($"<color=green>RestartListeningAfterDelay: Session is Active. Calling StartListening()...</color>"); // Changed Color
+            if(verboseDiagnostics) Debug.Log($"<color=green>RestartListeningAfterDelay: Session is Active. Calling StartListening()...</color>");
             StartListening();
         } else {
-            Debug.LogWarning($"<color=orange>RestartListeningAfterDelay: Session not active (State={currentState}). Not restarting listener.</color>"); // Changed Color
+            if(verboseDiagnostics) Debug.LogWarning($"<color=orange>RestartListeningAfterDelay: Session not active (State={currentState}). Not restarting listener.</color>");
         }
     }
 
+    private Color ParseColor(string colorName)
+    {
+        if (string.IsNullOrEmpty(colorName)) return Color.white;
+        switch (colorName.ToLower()) {
+            case "red": return Color.red;
+            case "blue": return Color.blue;
+            case "green": return Color.green;
+            case "yellow": return Color.yellow;
+            case "white": return Color.white;
+            case "black": return Color.black;
+            case "cyan": return Color.cyan;
+            case "magenta": return Color.magenta;
+            case "gray": case "grey": return Color.gray;
+            case "purple": return new Color(0.5f, 0f, 0.5f);
+            case "orange": return new Color(1.0f, 0.65f, 0f);
+            case "pink": return new Color(1.0f, 0.75f, 0.8f);
+            case "warm white": case "warm": return new Color(1.0f, 0.9f, 0.8f);
+            case "cool white": case "cool": return new Color(0.8f, 0.9f, 1.0f);
+            default: Debug.LogWarning($"ParseColor: Unrecognized color name '{colorName}'. Returning white."); return Color.white;
+        }
+    }
 
     private void SuggestAlternativeCommands()
     {
+        if (sessionController == null || feedbackManager == null) return;
         SessionState currentState = sessionController.GetCurrentState();
         switch (currentState) {
-            case SessionState.Idle:
-                feedbackManager.ShowSuggestion("Try saying: \"Start therapy\"");
-                break;
-            case SessionState.Active:
-                feedbackManager.ShowSuggestion("Try saying: \"Next step\" or \"Continue\"");
-                break;
-            case SessionState.Complete:
-                feedbackManager.ShowSuggestion("Session complete. Say \"Start therapy\" to begin again.");
-                break;
+            case SessionState.Idle: feedbackManager.ShowSuggestion("Try saying: \"Start therapy\""); break;
+            case SessionState.Active: feedbackManager.ShowSuggestion("Try saying: \"Next step\" or \"Continue\""); break;
+            case SessionState.Complete: feedbackManager.ShowSuggestion("Session complete. Say \"Start therapy\" to begin again."); break;
         }
     }
 
@@ -668,23 +640,16 @@ public class VoiceCommandManager : MonoBehaviour
     private int LevenshteinDistance(string s, string t) {
         if (string.IsNullOrEmpty(s)) return string.IsNullOrEmpty(t) ? 0 : t.Length;
         if (string.IsNullOrEmpty(t)) return s.Length;
-
-        int n = s.Length;
-        int m = t.Length;
+        int n = s.Length; int m = t.Length;
         int[,] d = new int[n + 1, m + 1];
-
         for (int i = 0; i <= n; d[i, 0] = i++) ;
         for (int j = 0; j <= m; d[0, j] = j++) ;
-
         for (int i = 1; i <= n; i++) {
             for (int j = 1; j <= m; j++) {
                 int cost = (t[j - 1] == s[i - 1]) ? 0 : 1;
-                d[i, j] = Math.Min(
-                    Math.Min(d[i - 1, j] + 1, d[i, j - 1] + 1),
-                    d[i - 1, j - 1] + cost);
+                d[i, j] = Math.Min(Math.Min(d[i - 1, j] + 1, d[i, j - 1] + 1), d[i - 1, j - 1] + cost);
             }
-        }
-        return d[n, m];
+        } return d[n, m];
     }
 
 
@@ -694,43 +659,26 @@ public class VoiceCommandManager : MonoBehaviour
         #if UNITY_EDITOR
         HandleEditorKeyboardInput();
         #endif
-
-        // Removed auto-reactivate timer logic - rely on Activate on Start / VAD / specific event restarts
     }
 
     #if UNITY_EDITOR
     private void HandleEditorKeyboardInput() {
-        // S key for Start Session
-        if (Input.GetKeyDown(KeyCode.S)) {
+        if (Input.GetKeyDown(KeyCode.S)) { // Start Session
             Debug.Log("EDITOR: S key pressed - Starting session");
             sessionController?.StartSession();
             feedbackManager?.PlaySuccessFeedback("Session started (keyboard)");
-            StartListening(); // Restart listening after command
-        }
-        // N key for Next Step
-        else if (Input.GetKeyDown(KeyCode.N)) {
-            Debug.Log("EDITOR: N key pressed - Next step");
-            sessionController?.AdvanceToNextStep();
-            feedbackManager?.PlaySuccessFeedback("Next step (keyboard)");
-            StartListening(); // Restart listening after command
-        }
-        // C key also for Continue/Next
-        else if (Input.GetKeyDown(KeyCode.C)) {
-             Debug.Log("EDITOR: C key pressed - Continue/Next step");
+            StartListening();
+        } else if (Input.GetKeyDown(KeyCode.N) || Input.GetKeyDown(KeyCode.C)) { // Next/Continue
+             Debug.Log("EDITOR: N/C key pressed - Next step");
              sessionController?.AdvanceToNextStep();
              feedbackManager?.PlaySuccessFeedback("Next step (keyboard)");
-             StartListening(); // Restart listening after command
-        }
-        // E key for End Session
-        else if (Input.GetKeyDown(KeyCode.E)) {
+             StartListening();
+        } else if (Input.GetKeyDown(KeyCode.E)) { // End Session
             Debug.Log("EDITOR: E key pressed - Ending session");
             sessionController?.EndSession();
             feedbackManager?.PlaySuccessFeedback("Session ended (keyboard)");
-            // Optionally stop listening after ending
-            // StopListening();
-        }
-         // D key for Debug Status / Force Restart Listener
-        else if (Input.GetKeyDown(KeyCode.D)) {
+            // StopListening(); // Optional
+        } else if (Input.GetKeyDown(KeyCode.D)) { // Debug Status / Restart Listener
             Debug.Log($"====== EDITOR: VOICE SYSTEM STATUS (D Key) ======");
             Debug.Log($"Session State: {sessionController?.GetCurrentState()}");
             Debug.Log($"Is Listening Flag: {isListening}");
@@ -738,7 +686,6 @@ public class VoiceCommandManager : MonoBehaviour
             Debug.Log($"AppVoiceExperience IsRequestActive: {appVoiceExperience?.IsRequestActive}");
             Debug.Log("Forcing voice listener restart...");
             StopListening();
-             // Add a small delay before starting again if needed
             StartCoroutine(RestartListeningAfterDelay(0.2f));
         }
     }
