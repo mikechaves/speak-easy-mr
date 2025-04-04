@@ -21,6 +21,11 @@ public class SessionController : MonoBehaviour
     [SerializeField] private VoiceCommandManager voiceCommandManager;
     [SerializeField] private FeedbackManager feedbackManager;
     [SerializeField] private MonoBehaviour enhancedUI; // Change to MonoBehaviour to avoid namespace issues
+
+    [Header("UI Positioning")]
+    [SerializeField] private Transform therapyEnvironmentRoot; // Drag your 'Therapy Environment' GameObject here
+    [SerializeField] private float defaultDistance = 2.0f; // How far in front to place it
+    [SerializeField] private float defaultHeight = 0.0f; // Vertical offset from camera height
     
     private SessionState currentState = SessionState.Idle;
     private int currentStepIndex = -1;
@@ -202,6 +207,31 @@ public class SessionController : MonoBehaviour
     // --- Ensure this ENTIRE method is included inside your SessionController class: ---
     private void ShowIdleInstructions()
     {
+        if (therapyEnvironmentRoot != null && Camera.main != null)
+        {
+            Transform cameraTransform = Camera.main.transform;
+            // Calculate position in front of camera
+            Vector3 targetPosition = cameraTransform.position + (cameraTransform.forward * defaultDistance);
+            // Adjust height relative to camera
+            targetPosition.y = cameraTransform.position.y + defaultHeight;
+
+            // Set the root object's position
+            therapyEnvironmentRoot.position = targetPosition;
+
+            // Make the root object face the camera (optional, good for consistent orientation)
+            // Get rotation that looks at camera, but only rotate around Y axis
+            Vector3 lookPos = cameraTransform.position;
+            lookPos.y = therapyEnvironmentRoot.position.y; // Keep UI level
+            therapyEnvironmentRoot.LookAt(lookPos);
+            therapyEnvironmentRoot.forward *= -1f; // Point towards camera correctly
+
+            Debug.Log($"Positioned Therapy Environment at {targetPosition} relative to camera.");
+        }
+        else {
+            if(therapyEnvironmentRoot == null) Debug.LogWarning("Therapy Environment Root not assigned in SessionController!");
+            if(Camera.main == null) Debug.LogWarning("Camera.main is null! Cannot position UI relative to camera.");
+        }
+
         currentState = SessionState.Idle;
         currentStepIndex = -1; // Optional: Ensure index is reset for idle state
 
