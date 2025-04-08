@@ -24,6 +24,7 @@ public class VoiceCommandManager : MonoBehaviour
     [Header("References")]
     [SerializeField] private SessionController sessionController;
     [SerializeField] private FeedbackManager feedbackManager;
+    // No explicit AudioManager reference needed due to Singleton pattern
 
     [Header("Command Settings")]
     [SerializeField] private string[] startSessionCommands = { "start therapy", "begin session", "start", "begin", "therapy", "ready" }; // Added "ready" based on logs
@@ -272,6 +273,8 @@ public class VoiceCommandManager : MonoBehaviour
                      }
 
                      if (actionTaken) {
+                        // *** AUDIO FEEDBACK ***
+                        AudioManager.Instance?.PlayConfirmationSound();
                         processedIntentInResponse = true; // Mark intent processed
                         if (!isListening) StartCoroutine(RestartListeningAfterDelay(1.0f)); // Restart listener
                      }
@@ -390,6 +393,8 @@ public class VoiceCommandManager : MonoBehaviour
              if (verboseDiagnostics) Debug.Log($"PRIORITY CONTINUE COMMAND DETECTED: '{correctedTranscript}'");
              sessionController.AdvanceToNextStep();
              feedbackManager?.PlaySuccessFeedback("Moving to next step");
+             // *** AUDIO FEEDBACK ***
+             AudioManager.Instance?.PlayConfirmationSound();
              commandMatched = true;
         }
         // Check for start only if idle
@@ -397,6 +402,8 @@ public class VoiceCommandManager : MonoBehaviour
              if (verboseDiagnostics) Debug.Log($"PRIORITY START COMMAND DETECTED: '{correctedTranscript}'");
              sessionController.StartSession();
              feedbackManager?.PlaySuccessFeedback("Session started");
+             // *** AUDIO FEEDBACK ***
+             AudioManager.Instance?.PlayConfirmationSound();
              commandMatched = true;
         }
         // Check for end session
@@ -404,6 +411,8 @@ public class VoiceCommandManager : MonoBehaviour
              Debug.Log($"COMMAND DETECTED: END SESSION - '{correctedTranscript}'");
              sessionController.EndSession();
              feedbackManager?.PlaySuccessFeedback("Session completed");
+             // *** AUDIO FEEDBACK ***
+             AudioManager.Instance?.PlayConfirmationSound();
              commandMatched = true;
         }
         // Fallback checks if specific priorities didn't match
@@ -414,6 +423,8 @@ public class VoiceCommandManager : MonoBehaviour
                  Debug.Log($"COMMAND DETECTED: START SESSION (Fallback) - '{correctedTranscript}'");
                  sessionController.StartSession();
                  feedbackManager?.PlaySuccessFeedback("Session started");
+                 // *** AUDIO FEEDBACK ***
+                 AudioManager.Instance?.PlayConfirmationSound();
                  commandMatched = true;
              }
              // Check next commands again (covers cases where IsPotentialContinueCommand was too broad/narrow)
@@ -421,6 +432,8 @@ public class VoiceCommandManager : MonoBehaviour
                  Debug.Log($"COMMAND DETECTED: NEXT STEP (Fallback) - '{correctedTranscript}'");
                  sessionController.AdvanceToNextStep();
                  feedbackManager?.PlaySuccessFeedback("Moving to next step");
+                 // *** AUDIO FEEDBACK ***
+                 AudioManager.Instance?.PlayConfirmationSound();
                  commandMatched = true;
              }
              // Last resort simple words for continue
@@ -428,6 +441,8 @@ public class VoiceCommandManager : MonoBehaviour
                  Debug.Log($"LAST RESORT CONTINUE MATCH: '{correctedTranscript}'");
                  sessionController.AdvanceToNextStep();
                  feedbackManager?.PlaySuccessFeedback("Moving to next step");
+                  // *** AUDIO FEEDBACK ***
+                 AudioManager.Instance?.PlayConfirmationSound();
                  commandMatched = true;
              }
         }
@@ -670,17 +685,22 @@ public class VoiceCommandManager : MonoBehaviour
         if (keyboard.sKey.wasPressedThisFrame) { // Start Session
             Debug.Log("EDITOR: S key pressed - Starting session");
             sessionController?.StartSession();
-            feedbackManager?.PlaySuccessFeedback("Session started (keyboard)");
+            // *** AUDIO FEEDBACK ***
+            AudioManager.Instance?.PlayConfirmationSound();
             StartListening();
         } else if (keyboard.nKey.wasPressedThisFrame || keyboard.cKey.wasPressedThisFrame) { // Next/Continue
             Debug.Log("EDITOR: N/C key pressed - Next step");
             sessionController?.AdvanceToNextStep();
             feedbackManager?.PlaySuccessFeedback("Next step (keyboard)");
+            // *** AUDIO FEEDBACK ***
+            AudioManager.Instance?.PlayConfirmationSound();
             StartListening();
         } else if (keyboard.eKey.wasPressedThisFrame) { // End Session
             Debug.Log("EDITOR: E key pressed - Ending session");
             sessionController?.EndSession();
             feedbackManager?.PlaySuccessFeedback("Session ended (keyboard)");
+            // *** AUDIO FEEDBACK ***
+            AudioManager.Instance?.PlayConfirmationSound();
             // StopListening(); // Optional
         } else if (keyboard.dKey.wasPressedThisFrame) { // Debug Status / Restart Listener
             Debug.Log($"====== EDITOR: VOICE SYSTEM STATUS (D Key) ======");

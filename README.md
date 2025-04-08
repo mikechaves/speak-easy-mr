@@ -20,6 +20,7 @@ SpeakEasy MR is an accessibility-focused Mixed Reality (MR) application develope
     * **Affirmation Display:** Presentation of positive affirmations with timed transitions and subtle visual effects.
 * **MR World Space UI**: User interface elements (instructions, visualizers) are placed in world space for stability and presence within the Passthrough view. Consistent initial positioning relative to the user.
 * **Ambient Background Music**: Includes a calming background audio track (generated via SUNO AI) managed by a dedicated `AudioManager` to enhance immersion.
+* **Audio Feedback**: Plays a confirmation sound upon successful execution of a voice command, providing immediate auditory feedback.
 * **(Planned/Conceptual)** Accessibility features like high contrast modes, adjustable text sizes.
 * **(Planned/Conceptual)** Privacy features.
 
@@ -28,8 +29,8 @@ SpeakEasy MR is an accessibility-focused Mixed Reality (MR) application develope
 The application utilizes Unity and Meta's SDKs, built upon these core components:
 
 * **`SessionController`**: Manages the therapy session sequence using an array of `TherapyStep` data objects. Responsible for activating/deactivating the appropriate step behavior for the current step.
-* **`VoiceCommandManager`**: Handles voice input, communication with Wit.ai (via `AppVoiceExperience`), intent/entity parsing (`modify_light`, `light_color`, `intensity_direction`, navigation commands), and calls appropriate methods on other managers/behaviors. Manages listener lifecycle (auto-start, auto-restart between active steps).
-* **`AudioManager`**: Manages playback of ambient background music. Integrated with `SessionController` to start/stop audio playback synchronized with the therapy session lifecycle.
+* **`VoiceCommandManager`**: Handles voice input, communication with Wit.ai (via `AppVoiceExperience`), intent/entity parsing (`modify_light`, `light_color`, `intensity_direction`, navigation commands), and calls appropriate methods on other managers/behaviors. Manages listener lifecycle (auto-start, auto-restart between active steps). **Triggers audio confirmation feedback via `AudioManager` upon successful command execution.**
+* **`AudioManager`**: Manages playback of ambient background music and **one-shot UI sounds (like voice command confirmations)**. Integrated with `SessionController` for background music lifecycle and triggered by `VoiceCommandManager` for confirmation sounds.
 * **`StepBehavior` Interface**: Defines `ExecuteStep()` and `StopStep()` methods implemented by components responsible for each therapy module's logic and visuals.
 * **`TherapyStep` Class**: A `[System.Serializable]` class holding instructions and a `MonoBehaviour stepBehaviorComponent` reference for each step, configured in the `SessionController` Inspector. (Uses `MonoBehaviour` field for reliable serialization).
 * **Step Behavior Implementations**:
@@ -46,7 +47,11 @@ The application utilizes Unity and Meta's SDKs, built upon these core components
     * Configure a Wit.ai application. Follow instructions in `Documentation/WitAiSetup.md` for initial setup.
     * Ensure the app is trained with necessary intents (e.g., `next_step`, `end_session`, `modify_light`) and relevant entities (custom `light_color`, `intensity_direction`, potentially `therapy_command`). Add varied utterances for robust recognition.
     * Link the corresponding `WitConfiguration` asset within the Unity project (assigned to `AppVoiceExperience` component).
-4.  Build for your target platform (Meta Quest 2/3/Pro recommended for Passthrough).
+4.  **Audio Setup:**
+    *   Ensure an `AudioManager` prefab/instance exists in your main scene.
+    *   Assign an appropriate audio clip to the `Background Music Clip` field in the `AudioManager` Inspector (optional but recommended).
+    *   Assign an appropriate audio clip to the `Confirmation Sound Clip` field in the `AudioManager` Inspector.
+5.  Build for your target platform (Meta Quest 2/3/Pro recommended for Passthrough).
 
 ## Documentation
 
@@ -70,6 +75,8 @@ The application utilizes Unity and Meta's SDKs, built upon these core components
 * Refactored UI placement using a root object (`Session UIs Root`) for consistent initial positioning in World Space.
 * Adjusted scale and layout of UI elements.
 * Fixed Scene view gizmo visibility issues for easier UI design.
+* Added `AudioManager` and ambient background music (SUNO AI generated).
+* Implemented audio confirmation sounds for successful voice commands.
 
 ## Controls
 
