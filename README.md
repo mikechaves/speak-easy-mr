@@ -19,6 +19,7 @@ SpeakEasy MR is an accessibility-focused Mixed Reality (MR) application develope
     * **Interactive Visualization:** User is placed in a simple environment (e.g., low-poly forest) where they can modify elements like lighting via voice commands.
     * **Affirmation Display:** Presentation of positive affirmations with timed transitions and subtle visual effects.
 * **MR World Space UI**: User interface elements (instructions, visualizers) are placed in world space for stability and presence within the Passthrough view. Consistent initial positioning relative to the user.
+* **Ambient Background Music**: Includes a calming background audio track (generated via SUNO AI) managed by a dedicated `AudioManager` to enhance immersion.
 * **(Planned/Conceptual)** Accessibility features like high contrast modes, adjustable text sizes.
 * **(Planned/Conceptual)** Privacy features.
 
@@ -28,6 +29,7 @@ The application utilizes Unity and Meta's SDKs, built upon these core components
 
 * **`SessionController`**: Manages the therapy session sequence using an array of `TherapyStep` data objects. Responsible for activating/deactivating the appropriate step behavior for the current step.
 * **`VoiceCommandManager`**: Handles voice input, communication with Wit.ai (via `AppVoiceExperience`), intent/entity parsing (`modify_light`, `light_color`, `intensity_direction`, navigation commands), and calls appropriate methods on other managers/behaviors. Manages listener lifecycle (auto-start, auto-restart between active steps).
+* **`AudioManager`**: Manages playback of ambient background music. Integrated with `SessionController` to start/stop audio playback synchronized with the therapy session lifecycle.
 * **`StepBehavior` Interface**: Defines `ExecuteStep()` and `StopStep()` methods implemented by components responsible for each therapy module's logic and visuals.
 * **`TherapyStep` Class**: A `[System.Serializable]` class holding instructions and a `MonoBehaviour stepBehaviorComponent` reference for each step, configured in the `SessionController` Inspector. (Uses `MonoBehaviour` field for reliable serialization).
 * **Step Behavior Implementations**:
@@ -94,3 +96,4 @@ This project is available under MIT License.
 
 * Meta's Voice SDK and Wit.ai for speech recognition and NLU.
 * Unity Engine & TextMeshPro.
+* SUNO AI for generating the ambient background music track.
