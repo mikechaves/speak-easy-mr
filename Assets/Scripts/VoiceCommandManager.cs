@@ -8,6 +8,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq; // Used for ContainsAny optimization if added back
+using UnityEngine.InputSystem;
 
 public class VoiceCommandManager : MonoBehaviour
 {
@@ -663,22 +664,25 @@ public class VoiceCommandManager : MonoBehaviour
 
     #if UNITY_EDITOR
     private void HandleEditorKeyboardInput() {
-        if (Input.GetKeyDown(KeyCode.S)) { // Start Session
+        var keyboard = Keyboard.current;
+        if (keyboard == null) return;
+
+        if (keyboard.sKey.wasPressedThisFrame) { // Start Session
             Debug.Log("EDITOR: S key pressed - Starting session");
             sessionController?.StartSession();
             feedbackManager?.PlaySuccessFeedback("Session started (keyboard)");
             StartListening();
-        } else if (Input.GetKeyDown(KeyCode.N) || Input.GetKeyDown(KeyCode.C)) { // Next/Continue
-             Debug.Log("EDITOR: N/C key pressed - Next step");
-             sessionController?.AdvanceToNextStep();
-             feedbackManager?.PlaySuccessFeedback("Next step (keyboard)");
-             StartListening();
-        } else if (Input.GetKeyDown(KeyCode.E)) { // End Session
+        } else if (keyboard.nKey.wasPressedThisFrame || keyboard.cKey.wasPressedThisFrame) { // Next/Continue
+            Debug.Log("EDITOR: N/C key pressed - Next step");
+            sessionController?.AdvanceToNextStep();
+            feedbackManager?.PlaySuccessFeedback("Next step (keyboard)");
+            StartListening();
+        } else if (keyboard.eKey.wasPressedThisFrame) { // End Session
             Debug.Log("EDITOR: E key pressed - Ending session");
             sessionController?.EndSession();
             feedbackManager?.PlaySuccessFeedback("Session ended (keyboard)");
             // StopListening(); // Optional
-        } else if (Input.GetKeyDown(KeyCode.D)) { // Debug Status / Restart Listener
+        } else if (keyboard.dKey.wasPressedThisFrame) { // Debug Status / Restart Listener
             Debug.Log($"====== EDITOR: VOICE SYSTEM STATUS (D Key) ======");
             Debug.Log($"Session State: {sessionController?.GetCurrentState()}");
             Debug.Log($"Is Listening Flag: {isListening}");
