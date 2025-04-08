@@ -114,7 +114,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e573a2aed6698b047aff95224499b722, type: 3}
   m_Name: MetaXREyeTrackedFoveationFeature Android
   m_EditorClassIdentifier: 
-  m_enabled: 0
+  m_enabled: 1
   nameUi: Meta XR Eye Tracked Foveation
   version: 0.0.1
   featureIdInternal: com.meta.openxr.feature.eyetrackedfoveation
@@ -400,7 +400,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f647cc0545697264a9878224faada6d5, type: 3}
   m_Name: MetaQuestFeature Android
   m_EditorClassIdentifier: 
-  m_enabled: 0
+  m_enabled: 1
   nameUi: Meta Quest Support
   version: 1.0.0
   featureIdInternal: com.unity.openxr.feature.metaquest
@@ -432,7 +432,7 @@ MonoBehaviour:
   lateLatchingMode: 0
   lateLatchingDebug: 0
   optimizeMultiviewRenderRegions: 0
-  spacewarpMotionVectorTextureFormat: 0
+  spacewarpMotionVectorTextureFormat: 1
 --- !u!114 &-970096439822763820
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -850,28 +850,28 @@ MonoBehaviour:
   m_Name: Standalone
   m_EditorClassIdentifier: 
   features:
-  - {fileID: 6286726286665740297}
-  - {fileID: -1516971788686774444}
-  - {fileID: 5897900519734336604}
-  - {fileID: 3566289032164668797}
-  - {fileID: -8901935223479146998}
-  - {fileID: -2718699731113153965}
+  - {fileID: -7064146231593426345}
   - {fileID: 241454828072737158}
+  - {fileID: -2711902595446956327}
+  - {fileID: -2718699731113153965}
+  - {fileID: 498677966351928096}
   - {fileID: 4194420925875351379}
+  - {fileID: 3443032343615636443}
+  - {fileID: 4450243854199058176}
+  - {fileID: -3926831639877946227}
+  - {fileID: -905452724989158288}
+  - {fileID: -1516971788686774444}
+  - {fileID: 3566289032164668797}
+  - {fileID: 5897900519734336604}
+  - {fileID: 6286726286665740297}
   - {fileID: 2943570112339710935}
   - {fileID: 200419250392876319}
-  - {fileID: -5700459544107393004}
-  - {fileID: 4450243854199058176}
-  - {fileID: 498677966351928096}
-  - {fileID: -701581732897117082}
-  - {fileID: -905452724989158288}
-  - {fileID: -3926831639877946227}
-  - {fileID: 1696423506661353244}
-  - {fileID: -8963085995247174761}
-  - {fileID: 3443032343615636443}
-  - {fileID: -2711902595446956327}
   - {fileID: 120350214376744087}
-  - {fileID: -7064146231593426345}
+  - {fileID: -701581732897117082}
+  - {fileID: 1696423506661353244}
+  - {fileID: -8901935223479146998}
+  - {fileID: -5700459544107393004}
+  - {fileID: -8963085995247174761}
   m_renderMode: 1
   m_autoColorSubmissionMode: 1
   m_colorSubmissionModes:
@@ -979,8 +979,8 @@ MonoBehaviour:
   m_colorSubmissionModes:
     m_List: 00000000
   m_depthSubmissionMode: 0
-  m_spacewarpMotionVectorTextureFormat: 0
-  m_optimizeBufferDiscards: 0
+  m_spacewarpMotionVectorTextureFormat: 1
+  m_optimizeBufferDiscards: 1
   m_symmetricProjection: 0
 --- !u!114 &3566289032164668797
 MonoBehaviour:
@@ -1298,7 +1298,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3d28f705476c80d47acb3dfade3d3142, type: 3}
   m_Name: MetaXRFoveationFeature Android
   m_EditorClassIdentifier: 
-  m_enabled: 0
+  m_enabled: 1
   nameUi: Meta XR Foveation
   version: 1.0.0
   featureIdInternal: com.meta.openxr.feature.foveation
