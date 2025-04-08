@@ -4183,10 +4183,13 @@ MonoBehaviour:
   instructionText: {fileID: 1665937619}
   panelBackground: {fileID: 545176730}
   defaultFontSize: 36
-  textColor: {r: 1, g: 1, b: 1, a: 1}
-  backgroundColor: {r: 0.1, g: 0.1, b: 0.1, a: 0}
-  panelWidth: 851.4
-  panelHeight: 100
+  defaultTextColor: {r: 1, g: 1, b: 1, a: 1}
+  defaultBackgroundColor: {r: 0.1, g: 0.1, b: 0.1, a: 0}
+  panelWidth: 700
+  panelHeight: 340
+  useHighContrast: 0
+  highContrastTextColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  highContrastBackgroundColor: {r: 0, g: 0, b: 0, a: 1}
   animateOnTextChange: 1
   animationDuration: 0.3
 --- !u!1 &554843569

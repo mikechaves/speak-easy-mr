@@ -14,10 +14,16 @@ public class InstructionPanel : MonoBehaviour
     
     [Header("Accessibility Settings")]
     [SerializeField] private float defaultFontSize = 0.05f;
-    [SerializeField] private Color textColor = Color.white;
-    [SerializeField] private Color backgroundColor = new Color(0.1f, 0.1f, 0.1f, 0.8f);
-    [SerializeField] private float panelWidth = 0.6f;
+    [SerializeField] private Color defaultTextColor = Color.white; // Renamed for clarity
+    [SerializeField] private Color defaultBackgroundColor = new Color(0.1f, 0.1f, 0.1f, 0.8f); // Renamed
+    
+    [SerializeField] private float panelWidth = 0.6f; 
     [SerializeField] private float panelHeight = 0.3f;
+
+    [Space(10)] // Add some space in Inspector
+    [SerializeField] private bool useHighContrast = false; // Toggle for high contrast
+    [SerializeField] private Color highContrastTextColor = Color.yellow; // Example high contrast text
+    [SerializeField] private Color highContrastBackgroundColor = Color.black; // Example high contrast background
     
     [Header("Animation")]
     [SerializeField] private bool animateOnTextChange = true;
@@ -64,14 +70,31 @@ public class InstructionPanel : MonoBehaviour
     {
         if (instructionText != null)
         {
-            instructionText.fontSize = defaultFontSize;
-            instructionText.color = textColor;
+            instructionText.fontSize = defaultFontSize; // Keep applying default font size for now
+            // Apply color based on contrast mode
+            instructionText.color = useHighContrast ? highContrastTextColor : defaultTextColor;
+            Debug.Log($"InstructionPanel: Applied settings. High Contrast: {useHighContrast}, Text Color: {instructionText.color}"); // Added Log
         }
-        
+        else { Debug.LogWarning("InstructionPanel: instructionText reference is null."); }
+
         if (panelBackground != null)
         {
-            panelBackground.color = backgroundColor;
+            // Apply background color based on contrast mode
+            panelBackground.color = useHighContrast ? highContrastBackgroundColor : defaultBackgroundColor;
+            Debug.Log($"InstructionPanel: Applied settings. High Contrast: {useHighContrast}, Background Color: {panelBackground.color}"); // Added Log
         }
+        else { Debug.LogWarning("InstructionPanel: panelBackground reference is null."); }
+    }
+
+    /// <summary>
+    /// Sets the high contrast mode and immediately applies the settings.
+    /// </summary>
+    /// <param name="isEnabled">True to enable high contrast, false to disable.</param>
+    public void SetHighContrastMode(bool isEnabled)
+    {
+        useHighContrast = isEnabled;
+        Debug.Log($"InstructionPanel: High contrast mode set to {isEnabled}. Applying settings...");
+        ApplyAccessibilitySettings(); // Re-apply settings to update visuals
     }
     
     /// <summary>
