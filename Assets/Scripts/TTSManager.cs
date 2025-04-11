@@ -1,6 +1,7 @@
 using UnityEngine;
-using Meta.WitAi.TTS.Utilities; // Use the namespace where TTSSpeaker is located
-using Meta.WitAi.TTS.Data; // Use the namespace for TTSVoiceSettings if needed for voice selection later
+using UnityEngine.Events;
+using Meta.WitAi.TTS.Utilities;
+using Meta.WitAi.TTS.Data;
 
 // Simple Singleton TTS Manager
 public class TTSManager : MonoBehaviour
@@ -31,7 +32,15 @@ public class TTSManager : MonoBehaviour
 
     [Header("TTS References")]
     [Tooltip("Assign the TTSSpeaker component from your scene here.")]
-    [SerializeField] private TTSSpeaker speaker; // *** IMPORTANT: Assign this in the Inspector ***
+    [SerializeField] private TTSSpeaker speaker;
+
+    [Header("Events (For Other Scripts)")]
+    [Tooltip("Invoked when TTS playback begins.")]
+     public UnityEvent OnSpeakStart; // This event is for OrbAnimator etc.
+    [Tooltip("Invoked when TTS playback ends (completes, errors, or is cancelled).")]
+    public UnityEvent OnSpeakEnd; // This event is for OrbAnimator etc.
+
+    private bool isCurrentlySpeaking = false;
 
     // Optional: Reference to voice presets if you want to switch voices later
     // [SerializeField] private TTSVoiceSettings[] availableVoices;
@@ -74,6 +83,16 @@ public class TTSManager : MonoBehaviour
         // if (availableVoices != null && availableVoices.Length > 0) {
         //     SetVoice(availableVoices[0].PresetId); // Example: Set default voice
         // }
+    }
+
+    private void OnDestroy() {
+             // <<< --- REMOVED: Event unsubscription code from OnDestroy --- >>>
+             // Listeners connected via Inspector are handled automatically by Unity
+             // <<< --- END REMOVED --- >>>
+
+             if (_instance == this) {
+                 _instance = null;
+             }
     }
 
     /// <summary>
@@ -120,61 +139,60 @@ public class TTSManager : MonoBehaviour
         }
     }
 
-    // --- Optional Voice Selection Methods (Example) ---
+    // --- Event Handlers (MUST BE PUBLIC TO BE VISIBLE IN INSPECTOR) ---
 
-    // /// <summary>
-    // /// Sets the active voice preset for the TTSSpeaker.
-    // /// </summary>
-    // /// <param name="voicePresetID">The PresetID of the desired TTSVoiceSettings asset.</param>
-    // public void SetVoice(string voicePresetID)
-    // {
-    //     if (speaker == null) return;
-    //     if (string.IsNullOrEmpty(voicePresetID)) return;
+        /// <summary>
+        /// PUBLIC handler called by TTSSpeaker's "On Playback Started" Inspector event.
+        /// </summary>
+        public void HandlePlaybackStarted() { // <<< MADE PUBLIC >>>
+            Debug.Log("TTSManager: Handler - Playback Started");
+            if (!isCurrentlySpeaking) {
+                 isCurrentlySpeaking = true;
+                 OnSpeakStart?.Invoke(); // Invoke our own event for OrbAnimator etc.
+                 Debug.Log("TTSManager: OnSpeakStart Invoked.");
+            } else { Debug.Log("TTSManager: Playback Started event received, but already speaking. Ignoring duplicate start."); }
+        }
 
-    //     // Find the voice settings asset (implementation depends on how you store/manage them)
-    //     TTSVoiceSettings selectedSetting = FindVoiceSettingByID(voicePresetID); // You'd need to implement this lookup
+        /// <summary>
+        /// PUBLIC handler called by TTSSpeaker's "On Playback Complete" and "On Playback Cancelled" Inspector events.
+        /// </summary>
+        public void HandlePlaybackEnded() { // <<< MADE PUBLIC >>>
+             Debug.Log("TTSManager: Handler - Playback Ended (Completed or Cancelled)");
+             if (isCurrentlySpeaking) {
+                isCurrentlySpeaking = false;
+                OnSpeakEnd?.Invoke(); // Invoke our own event for OrbAnimator etc.
+                Debug.Log("TTSManager: OnSpeakEnd Invoked.");
+             } else { Debug.Log("TTSManager: Playback Ended event received, but already idle. Ignoring duplicate end."); }
+        }
 
-    //     if (selectedSetting != null)
-    //     {
-    //         speaker.VoiceSettings = selectedSetting; // Assign the found settings
-    //         selectedVoiceID = voicePresetID;
-    //         Debug.Log($"TTSManager: Voice set to {voicePresetID}");
-    //     }
-    //     else
-    //     {
-    //         Debug.LogWarning($"TTSManager: Voice preset with ID '{voicePresetID}' not found.");
-    //     }
-    // }
+        /// <summary>
+        /// PUBLIC handler called by TTSSpeaker's "On Error" Inspector event.
+        /// </summary>
+        /*
+        public void HandlePlaybackError(string code, string message) { // <<< MADE PUBLIC - Note: Inspector might not support string params directly
+             Debug.LogError($"TTSManager: Handler - Playback Error - Code: {code}, Message: {message}");
+              if (isCurrentlySpeaking) {
+                isCurrentlySpeaking = false;
+                OnSpeakEnd?.Invoke(); // Treat error as end of speaking
+                Debug.Log("TTSManager: OnSpeakEnd Invoked due to error.");
+             } else { Debug.Log("TTSManager: Playback Error event received, but already idle. Ignoring duplicate end."); }
+             // If the Inspector event for Error doesn't take string params, you might need a separate public void HandlePlaybackErrorSimple() method.
+        }
+        */
 
-    // /// <summary>
-    // /// Placeholder for finding voice settings by ID.
-    // /// </summary>
-    // private TTSVoiceSettings FindVoiceSettingByID(string id)
-    // {
-    //     if (availableVoices == null) return null;
-    //     foreach (var voice in availableVoices)
-    //     {
-    //         if (voice != null && voice.PresetId == id)
-    //         {
-    //             return voice;
-    //         }
-    //     }
-    //     return null; // Not found
-    // }
+        // Optional simple handler if the Inspector event for Error doesn't take parameters
+        /*
+        public void HandlePlaybackErrorSimple() {
+             Debug.LogError($"TTSManager: Handler - Playback Error (Simple)");
+             if (isCurrentlySpeaking) {
+                isCurrentlySpeaking = false;
+                OnSpeakEnd?.Invoke(); // Treat error as end of speaking
+                Debug.Log("TTSManager: OnSpeakEnd Invoked due to error.");
+             } else { Debug.Log("TTSManager: Playback Error event received, but already idle. Ignoring duplicate end."); }
+        }
+        */
 
-    // --- Optional Event Handlers ---
-
-    // private void HandlePlaybackComplete()
-    // {
-    //     Debug.Log("TTSManager: Playback Complete.");
-    //     // Unsubscribe or handle completion logic
-    //     // speaker.Events.OnPlaybackComplete.RemoveListener(HandlePlaybackComplete);
-    // }
-
-    // private void HandleSpeechError(string code, string message)
-    // {
-    //      Debug.LogError($"TTSManager: Speech Error - Code: {code}, Message: {message}");
-    //      // Unsubscribe or handle error logic
-    //      // speaker.Events.OnError.RemoveListener(HandleSpeechError);
-    // }
+        // --- Optional Voice Selection Methods ---
+        // public void SetVoice(string voicePresetID) { /* ... */ }
+        // private TTSVoiceSettings FindVoiceSettingByID(string id) { /* ... */ }
 }
