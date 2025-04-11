@@ -1,7 +1,6 @@
 using System.Collections;
 using UnityEngine;
 using TMPro;
-// Remove the UI.Enhanced namespace import since it's not recognized
 
 public enum SessionState
 {
@@ -12,62 +11,74 @@ public enum SessionState
 
 public class SessionController : MonoBehaviour
 {
-    [Header("Session Configuration")]
+    [Header("Session Messages")]
+    [Tooltip("The welcome message displayed and spoken when the session is idle.")]
+    [TextArea(3, 5)] // Allow multi-line editing in Inspector
+    [SerializeField] private string welcomeMessageText = "Welcome to Voice-Driven Therapy.\nSay \"Start therapy\" or \"Begin session\" to start.";
+    [Tooltip("The completion message displayed and spoken when the session ends.")]
+    [TextArea(3, 5)]
+    [SerializeField] private string completionMessageText = "Session complete. Thank you for participating.";
+
+    [Header("Therapy Steps Configuration")]
+    [Tooltip("The array containing the actual therapy steps (e.g., Breathing, Visualization). Should NOT include Welcome or Completion steps.")]
+    [SerializeField] private TherapyStep[] therapySteps; // Should contain the 5 active steps
     [SerializeField] private float commandTimeoutDuration = 30f;
-    [SerializeField] private TherapyStep[] therapySteps;
-    
+
+
     [Header("References")]
     [SerializeField] private TMP_Text instructionText;
     [SerializeField] private VoiceCommandManager voiceCommandManager;
     [SerializeField] private FeedbackManager feedbackManager;
-    [SerializeField] private MonoBehaviour enhancedUI; // Change to MonoBehaviour to avoid namespace issues
+    [SerializeField] private MonoBehaviour enhancedUI;
 
     [Header("UI Positioning")]
-    [SerializeField] private Transform therapyEnvironmentRoot; // Drag your 'Therapy Environment' GameObject here
-    [SerializeField] private float defaultDistance = 2.0f; // How far in front to place it
-    [SerializeField] private float defaultHeight = 0.0f; // Vertical offset from camera height
-    
+    [SerializeField] private Transform therapyEnvironmentRoot;
+    [SerializeField] private float defaultDistance = 2.0f;
+    [SerializeField] private float defaultHeight = 0.0f;
+
     private SessionState currentState = SessionState.Idle;
+    // Index for the therapySteps array (0 to Length-1 for the active steps)
     private int currentStepIndex = -1;
     private Coroutine timeoutCoroutine;
-    
-    // --- Replace the logging loop inside SessionController.Start() ---
+
     private void Start()
     {
         Debug.Log("--- SessionController: Checking Initial Step Behaviors ---");
+        // Check the actual therapy steps array
         if (therapySteps != null) {
-            for (int i = 0; i < therapySteps.Length; i++) {
-                if (therapySteps[i] != null) {
-                    // Log the assigned MonoBehaviour component
-                    string behaviorName = therapySteps[i].stepBehaviorComponent != null ? $"{therapySteps[i].stepBehaviorComponent.GetType().Name} on {therapySteps[i].stepBehaviorComponent.gameObject.name}" : "None";
-                    // Also check if it actually implements the interface
-                    bool implementsInterface = therapySteps[i].stepBehaviorComponent is StepBehavior; // Check if component implements interface
-                    Debug.Log($"Step {i}: Behavior Component = {behaviorName} (Implements StepBehavior? {implementsInterface})");
-                    if (therapySteps[i].stepBehaviorComponent != null && !implementsInterface) {
-                        // Add Error log if the assigned component is wrong type
-                        Debug.LogError($"<color=red>Step {i}: Assigned component '{behaviorName}' does NOT implement the StepBehavior interface!</color>");
+            for (int i = 0; i < therapySteps.Length; i++) { // Loop through the 5 active steps
+                if (therapySteps[i] != null && therapySteps[i].stepBehaviorComponent != null) {
+                    string behaviorName = $"{therapySteps[i].stepBehaviorComponent.GetType().Name} on {therapySteps[i].stepBehaviorComponent.gameObject.name}";
+                    StepBehavior behavior = therapySteps[i].stepBehaviorComponent.GetComponent<StepBehavior>();
+                    bool implementsInterface = (behavior != null);
+                    Debug.Log($"Therapy Step {i}: Behavior Component = {behaviorName} (GetComponent<StepBehavior> found? {implementsInterface})");
+                    if (!implementsInterface) {
+                        Debug.LogError($"<color=red>Therapy Step {i}: Assigned component '{behaviorName}' does NOT provide StepBehavior via GetComponent!</color>");
                     }
+                } else if (therapySteps[i] == null) {
+                    Debug.LogWarning($"Therapy Step {i}: Array element is null!");
                 } else {
-                    Debug.LogWarning($"Step {i}: TherapyStep array element is null!");
+                     Debug.LogWarning($"Therapy Step {i}: Has no stepBehaviorComponent assigned!");
                 }
             }
         } else {
-            Debug.LogWarning("TherapySteps array is null!");
+            Debug.LogWarning("TherapySteps array is null or empty!");
         }
         Debug.Log("-------------------------------------------------------");
 
-        ShowIdleInstructions(); // Keep original Start() code
+        ShowIdleInstructions(); // Show the separate welcome message
     }
-    
+
     public SessionState GetCurrentState()
     {
         return currentState;
     }
     public int GetCurrentStepIndex()
     {
-        return currentStepIndex; // Simply return the value of the private variable
+        // Return index relative to the active therapy steps (0-4)
+        return currentStepIndex;
     }
-    
+
     public void StartSession()
     {
         if (currentState == SessionState.Active)
@@ -75,156 +86,211 @@ public class SessionController : MonoBehaviour
             feedbackManager.PlayErrorFeedback("Session already in progress");
             return;
         }
-        
+        // Check if there are actual therapy steps defined
+        if (therapySteps == null || therapySteps.Length == 0)
+        {
+             Debug.LogError("StartSession: No therapy steps defined in the array!");
+             feedbackManager.PlayErrorFeedback("Session configuration error.");
+             return;
+        }
+
         currentState = SessionState.Active;
+        // Start at -1 so the first AdvanceToNextStep goes to index 0 (first actual therapy step)
         currentStepIndex = -1;
+        Debug.Log($"StartSession: Set currentStepIndex to {currentStepIndex}. Calling AdvanceToNextStep to go to the first therapy step (index 0).");
         AdvanceToNextStep();
     }
-    
+
+
     public void AdvanceToNextStep()
     {
         if (currentState != SessionState.Active)
         {
-            feedbackManager.PlayErrorFeedback("No active session");
+            if (currentState != SessionState.Complete) {
+                 feedbackManager.PlayErrorFeedback("No active session");
+            }
             return;
         }
-        
-        // Cancel existing timeout if there is one
-        if (timeoutCoroutine != null)
-        {
-            StopCoroutine(timeoutCoroutine);
-        }
-        
-        currentStepIndex++;
-        
-        // Check if we've completed all steps
-        if (currentStepIndex >= therapySteps.Length)
-        {
-            CompleteSession();
-            return;
-        }
-        
-        // Display the current step
-        DisplayCurrentStep();
-        
-        // Start timeout for this step
-        timeoutCoroutine = StartCoroutine(CommandTimeoutRoutine());
-        
-        // Update enhanced UI if available
-        if (enhancedUI != null)
-        {
-            // Use SendMessage to avoid direct type references
-            enhancedUI.SendMessage("ShowActiveState", therapySteps[currentStepIndex].instructions, SendMessageOptions.DontRequireReceiver);
-            
-            // For progress update, create a message with both parameters
-            object[] progressParams = new object[] { currentStepIndex + 1, therapySteps.Length };
-            enhancedUI.SendMessage("UpdateProgressBar", progressParams, SendMessageOptions.DontRequireReceiver);
-        }
-    }
-    
-    public void EndSession()
-    {
-        CompleteSession();
-    }
-    
-    private void CompleteSession()
-    {
-        currentState = SessionState.Complete;
-        
+
         if (timeoutCoroutine != null)
         {
             StopCoroutine(timeoutCoroutine);
             timeoutCoroutine = null;
         }
-        
-        instructionText.text = "Session complete. Thank you for participating.\nSay \"Start therapy\" to begin again.";
-        feedbackManager.PlaySuccessFeedback("Session completed successfully");
-        
-        // Update enhanced UI if available
+
+        currentStepIndex++; // Increment index for the therapySteps array (0-4)
+        Debug.Log($"AdvanceToNextStep: Incremented index to {currentStepIndex}");
+
+        // Check if we have completed all steps in the therapySteps array
+        if (currentStepIndex >= therapySteps.Length)
+        {
+            Debug.Log($"AdvanceToNextStep: Completed last therapy step (index {currentStepIndex - 1}). Completing session.");
+            CompleteSession(); // Call completion which uses the separate message
+            return;
+        }
+
+        // Check if the target step index is valid within the array
+         if (therapySteps == null || currentStepIndex < 0 || currentStepIndex >= therapySteps.Length || therapySteps[currentStepIndex] == null)
+         {
+             Debug.LogError($"AdvanceToNextStep: Invalid step index or data ({currentStepIndex}) after increment. Completing session.");
+             CompleteSession();
+             return;
+         }
+
+        DisplayCurrentStep(); // Display the therapy step (index 0-4)
+
+        // Start timeout only for steps with behavior components
+        if (therapySteps[currentStepIndex].stepBehaviorComponent != null) {
+             Debug.Log($"AdvanceToNextStep: Starting timeout for therapy step {currentStepIndex}");
+             timeoutCoroutine = StartCoroutine(CommandTimeoutRoutine());
+        } else {
+             Debug.Log($"AdvanceToNextStep: Therapy Step {currentStepIndex} has no behavior, not starting timeout.");
+        }
+
+        // Update Enhanced UI (adjust progress based on 5 steps)
+        if (enhancedUI != null)
+        {
+            if (currentStepIndex >= 0 && currentStepIndex < therapySteps.Length && therapySteps[currentStepIndex] != null) {
+                 int displayStepNum = currentStepIndex + 1; // Show 1-5 for progress
+                 int totalDisplaySteps = therapySteps.Length; // Total is 5
+                 enhancedUI.SendMessage("ShowActiveState", therapySteps[currentStepIndex].instructions, SendMessageOptions.DontRequireReceiver);
+                 object[] progressParams = new object[] { displayStepNum, totalDisplaySteps };
+                 enhancedUI.SendMessage("UpdateProgressBar", progressParams, SendMessageOptions.DontRequireReceiver);
+            }
+        }
+    }
+
+    public void EndSession()
+    {
+         Debug.Log("EndSession called.");
+        CompleteSession();
+    }
+
+    private void CompleteSession()
+    {
+        if (currentState == SessionState.Complete) return;
+
+        Debug.Log("CompleteSession executing...");
+        currentState = SessionState.Complete;
+        currentStepIndex = -1; // Reset index
+
+        if (timeoutCoroutine != null)
+        {
+            StopCoroutine(timeoutCoroutine);
+            timeoutCoroutine = null;
+        }
+
+        ActivateCurrentStepAndDeactivateOthers(-1); // Deactivate any active therapy step
+
+        // *** Use the separate completion message text field ***
+        string finalCompletionMessage = string.IsNullOrEmpty(completionMessageText) ? "Session completed." : completionMessageText;
+        // *****************************************************
+
+        // Update UI Text
+        if(instructionText != null) {
+            instructionText.text = finalCompletionMessage;
+        } else {
+             Debug.LogWarning("CompleteSession: instructionText reference is missing!");
+        }
+
+        // *** Speak the separate completion message ***
+        TTSManager.Instance.Speak(finalCompletionMessage);
+        // *********************************************
+
         if (enhancedUI != null)
         {
             enhancedUI.SendMessage("ShowWelcomeState", null, SendMessageOptions.DontRequireReceiver);
         }
     }
-    
-    // --- CORRECTED SessionController.DisplayCurrentStep ---
-    // Replace the entire method in SessionController.cs with this corrected version:
+
+    // Displays the active therapy step (index 0-4)
     private void DisplayCurrentStep()
     {
-        // Check for invalid index first
-        if (currentStepIndex < 0 || currentStepIndex >= therapySteps.Length)
+        // Validity check for therapySteps array index
+        if (therapySteps == null || currentStepIndex < 0 || currentStepIndex >= therapySteps.Length || therapySteps[currentStepIndex] == null)
         {
-            Debug.LogWarning($"SessionController: DisplayCurrentStep called with invalid index: {currentStepIndex}. Deactivating all steps.");
-            // Use the CORRECT helper method name here:
-            ActivateCurrentStepAndDeactivateOthers(-1); // Deactivate all if index is invalid
-            if (instructionText != null) instructionText.text = "Session ended or invalid state."; // Show message
-            return; // Stop further processing
+            Debug.LogWarning($"SessionController: DisplayCurrentStep called with invalid therapy step index or null data: {currentStepIndex}.");
+            // Optionally complete session or handle error
+            CompleteSession();
+            return;
         }
 
-        // Index is valid, proceed
         TherapyStep currentStepData = therapySteps[currentStepIndex];
-        Debug.Log($"<color=cyan>SessionController: Displaying Step {currentStepIndex}. Instructions: '{currentStepData.instructions}'</color>");
+        string stepInstructions = currentStepData.instructions; // Get instructions from Inspector
+        Debug.Log($"<color=cyan>SessionController: Displaying Therapy Step {currentStepIndex}. Instructions: '{stepInstructions}'</color>");
 
-        // Update Instructions UI
+        // Update UI Text
         if (instructionText != null) {
-            instructionText.text = currentStepData.instructions;
+            instructionText.text = stepInstructions;
         } else {
             Debug.LogWarning("SessionController: instructionText reference is missing!");
         }
 
-        // Activate the current step's behavior AND deactivate all others
-        // Use the CORRECT helper method name here:
+        // Activate visuals/behavior for this therapy step *BEFORE* speaking
         ActivateCurrentStepAndDeactivateOthers(currentStepIndex);
 
-        // Now execute the current step's behavior (it should have been activated by the helper method if needed)
+        // Announce Behavior Name (if applicable) and Speak Instructions
+        string behaviorName = null;
+        StepBehavior behavior = null;
+
         if (currentStepData.stepBehaviorComponent != null)
         {
-            StepBehavior behavior = currentStepData.stepBehaviorComponent as StepBehavior;
-            if (behavior != null)
-            {
-                // Only call ExecuteStep if the component's GameObject is active in the hierarchy
-                if(currentStepData.stepBehaviorComponent.gameObject.activeInHierarchy) {
-                    string behaviorName = $"{currentStepData.stepBehaviorComponent.GetType().Name} on {currentStepData.stepBehaviorComponent.gameObject.name}";
-                    Debug.Log($"<color=cyan>SessionController: Calling ExecuteStep() for Step {currentStepIndex} ({behaviorName})...</color>");
-                    try {
-                        behavior.ExecuteStep();
-                    } catch (System.Exception e) {
-                        Debug.LogError($"<color=red>SessionController: Error calling ExecuteStep for Step {currentStepIndex} ({behaviorName}): {e.Message}\n{e.StackTrace}</color>");
-                    }
-                } else {
-                    // This case should ideally not happen if ActivateCurrentStepAndDeactivateOthers worked correctly
-                    Debug.LogWarning($"SessionController: Behavior component for step {currentStepIndex} is assigned but its GameObject is not active in hierarchy after activation attempt. ExecuteStep skipped.");
-                }
-            }
-            else {
-                Debug.LogError($"<color=red>SessionController: Step {currentStepIndex}: Assigned component '{currentStepData.stepBehaviorComponent.GetType().Name}' does NOT implement StepBehavior!</color>");
+            behavior = currentStepData.stepBehaviorComponent.GetComponent<StepBehavior>();
+            if (behavior != null) {
+                 behaviorName = currentStepData.stepBehaviorComponent.GetType().Name;
+                 behaviorName = behaviorName.Replace("Visualizer", "").Replace("Environment", "").Replace("Display", ""); // Simplify name
+                 TTSManager.Instance.Speak($"Starting {behaviorName}."); // Announce step type
+            } else {
+                 Debug.LogError($"<color=red>SessionController: Therapy Step {currentStepIndex}: Assigned component '{currentStepData.stepBehaviorComponent.GetType().Name}' does NOT provide StepBehavior via GetComponent!</color>");
             }
         } else {
-            Debug.Log($"<color=grey>SessionController: Step {currentStepIndex} has no Step Behavior Component assigned.</color>");
+            // This therapy step might be informational only
+            Debug.Log($"<color=grey>SessionController: Therapy Step {currentStepIndex} has no Step Behavior Component assigned.</color>");
+        }
+
+        // Speak the step instructions from Inspector after potential announcement delay
+        float instructionDelay = string.IsNullOrEmpty(behaviorName) ? 0f : 1.0f; // Adjust delay if needed
+        StartCoroutine(SpeakAfterDelay(stepInstructions, instructionDelay));
+
+        // Execute the step's behavior *if it exists and was found*
+        if (behavior != null)
+        {
+            if(currentStepData.stepBehaviorComponent.gameObject.activeInHierarchy) {
+                Debug.Log($"<color=cyan>SessionController: Calling ExecuteStep() for Step {currentStepIndex} ({behaviorName})...</color>");
+                try {
+                    behavior.ExecuteStep();
+                } catch (System.Exception e) {
+                    Debug.LogError($"<color=red>SessionController: Error calling ExecuteStep for Step {currentStepIndex} ({behaviorName}): {e.Message}\n{e.StackTrace}</color>");
+                }
+            } else {
+                Debug.LogWarning($"SessionController: Behavior component for step {currentStepIndex} ({currentStepData.stepBehaviorComponent.name}) is assigned but its GameObject is not active in hierarchy. ExecuteStep skipped.");
+            }
         }
     }
 
-    // --- Ensure this ENTIRE method is included inside your SessionController class: ---
+    // Helper coroutine to speak instructions after a delay
+    private IEnumerator SpeakAfterDelay(string text, float delay) {
+        if (string.IsNullOrEmpty(text)) yield break; // Don't speak empty text
+        if (delay > 0) {
+            yield return new WaitForSeconds(delay);
+        }
+        TTSManager.Instance.Speak(text);
+    }
+
+    // Shows the initial idle state with the separate welcome message
     private void ShowIdleInstructions()
     {
+        // Position UI
         if (therapyEnvironmentRoot != null && Camera.main != null)
         {
             Transform cameraTransform = Camera.main.transform;
-            // Calculate position in front of camera
             Vector3 targetPosition = cameraTransform.position + (cameraTransform.forward * defaultDistance);
-            // Adjust height relative to camera
             targetPosition.y = cameraTransform.position.y + defaultHeight;
-
-            // Set the root object's position
             therapyEnvironmentRoot.position = targetPosition;
-
-            // Make the root object face the camera (optional, good for consistent orientation)
-            // Get rotation that looks at camera, but only rotate around Y axis
             Vector3 lookPos = cameraTransform.position;
-            lookPos.y = therapyEnvironmentRoot.position.y; // Keep UI level
+            lookPos.y = therapyEnvironmentRoot.position.y;
             therapyEnvironmentRoot.LookAt(lookPos);
-            therapyEnvironmentRoot.forward *= -1f; // Point towards camera correctly
-
+            therapyEnvironmentRoot.forward *= -1f;
             Debug.Log($"Positioned Therapy Environment at {targetPosition} relative to camera.");
         }
         else {
@@ -233,93 +299,107 @@ public class SessionController : MonoBehaviour
         }
 
         currentState = SessionState.Idle;
-        currentStepIndex = -1; // Optional: Ensure index is reset for idle state
+        currentStepIndex = -1; // Reset therapy step index
 
-        if (instructionText != null) { // Added null check
-            instructionText.text = "Welcome to Voice-Driven Therapy.\nSay \"Start therapy\" or \"Begin session\" to start.";
+        // *** Use the separate welcome message text field ***
+        string initialWelcomeMessage = string.IsNullOrEmpty(welcomeMessageText) ? "Welcome." : welcomeMessageText;
+        // **************************************************
+
+        // Update UI Text and Speak Welcome Message
+        if (instructionText != null) {
+            instructionText.text = initialWelcomeMessage;
+            TTSManager.Instance.Speak(initialWelcomeMessage);
         } else {
             Debug.LogWarning("SessionController: instructionText reference is missing!");
         }
 
-        // Update enhanced UI if available
-        if (enhancedUI != null)
-        {
+        if (enhancedUI != null) {
             enhancedUI.SendMessage("ShowWelcomeState", null, SendMessageOptions.DontRequireReceiver);
         }
 
-        // --- ADD THESE LINES ---
-        // Deactivate all step behaviors when entering Idle state
-        Debug.Log("<color=orange>ShowIdleInstructions: Deactivating all step behaviors for Idle state.</color>");
-        ActivateCurrentStepAndDeactivateOthers(-1); // Pass -1 to deactivate all steps
-        // --- END OF ADDED LINES ---
+        Debug.Log("<color=orange>ShowIdleInstructions: Deactivating all therapy step behaviors for Idle state.</color>");
+        ActivateCurrentStepAndDeactivateOthers(-1); // Ensure all therapy step behaviors are off
     }
 
-    // --- Add this ENTIRE method inside your SessionController class ---
-    // Make sure it's inside the class braces { }, for example, after the
-    // ShowIdleInstructions() method or before the final closing brace } of the class.
-
+    // Activates the therapy step at activeIndex (0-4) and deactivates others
     private void ActivateCurrentStepAndDeactivateOthers(int activeIndex)
     {
-        if (therapySteps == null) return;
+        if (therapySteps == null) {
+             Debug.LogWarning("ActivateCurrentStepAndDeactivateOthers: therapySteps array is null.");
+             return;
+        }
 
+        // Loop through the therapySteps array (indices 0-4)
         for (int i = 0; i < therapySteps.Length; i++)
         {
-            if (therapySteps[i]?.stepBehaviorComponent != null)
+             if (therapySteps[i] == null) continue;
+
+            // Only process steps with behavior components
+            if (therapySteps[i].stepBehaviorComponent != null)
             {
-                StepBehavior behavior = therapySteps[i].stepBehaviorComponent as StepBehavior;
-                if (behavior == null) continue; // Skip if component doesn't implement interface
-
                 GameObject targetObject = therapySteps[i].stepBehaviorComponent.gameObject;
+                if (targetObject == null) {
+                    Debug.LogError($"ActivateCurrentStepAndDeactivateOthers: GameObject is null for stepBehaviorComponent at therapy step index {i}!");
+                    continue;
+                }
+                StepBehavior behavior = targetObject.GetComponent<StepBehavior>();
 
-                if (i == activeIndex)
+                if (i == activeIndex) // Activate
                 {
-                    // Activate the CURRENT step's GameObject if it's not already active
-                    if (!targetObject.activeSelf) // Check activeSelf, not activeInHierarchy, for direct activation call
-                    {
-                        Debug.Log($"<color=lime>ActivateCurrentStep: Activating Step {i} ({targetObject.name})</color>");
+                    if (!targetObject.activeSelf) {
+                        Debug.Log($"<color=lime>ActivateCurrentStep: Activating Therapy Step {i} ({targetObject.name})</color>");
                         targetObject.SetActive(true);
-                        // Note: ExecuteStep is called separately in DisplayCurrentStep after this function runs
                     }
                 }
-                else
+                else // Deactivate
                 {
-                    // Deactivate all OTHER steps
-                    if (targetObject.activeSelf) // Only stop/deactivate if currently active
-                    {
-                        Debug.Log($"<color=orange>ActivateCurrentStep: Stopping/Deactivating Step {i} ({targetObject.name})</color>");
-                        try {
-                            behavior.StopStep(); // Call the interface method (which should now handle SetActive(false))
-                        } catch (System.Exception e) {
-                             Debug.LogError($"<color=red>SessionController: Error calling StopStep for Step {i} ({targetObject.name}): {e.Message}\n{e.StackTrace}</color>");
-                             // Fallback: Force deactivate if StopStep failed but object still active
-                             if(targetObject.activeSelf) targetObject.SetActive(false);
+                    if (targetObject.activeSelf) {
+                        Debug.Log($"<color=orange>ActivateCurrentStep: Stopping/Deactivating Therapy Step {i} ({targetObject.name})</color>");
+                        if (behavior != null) {
+                             try { behavior.StopStep(); } catch (System.Exception e) {
+                                Debug.LogError($"<color=red>SessionController: Error calling StopStep for Therapy Step {i} ({targetObject.name}): {e.Message}</color>");
+                                if(targetObject.activeSelf) targetObject.SetActive(false);
+                            }
+                        } else {
+                             Debug.LogWarning($"<color=orange>ActivateCurrentStep: Could not get StepBehavior for Therapy Step {i} ({targetObject.name}). Forcing SetActive(false).</color>");
+                             targetObject.SetActive(false);
                         }
-                        // Ensure inactive even if StopStep forgot or failed without error
-                         if(targetObject.activeSelf) targetObject.SetActive(false);
+                        if(targetObject.activeSelf) { // Final check
+                            Debug.LogWarning($"<color=orange>ActivateCurrentStep: Forcing SetActive(false) for Therapy Step {i} ({targetObject.name}) after checks.</color>");
+                            targetObject.SetActive(false);
+                        }
                     }
                 }
             }
         }
     }
-    
+
     private IEnumerator CommandTimeoutRoutine()
     {
+         if (currentState != SessionState.Active) yield break;
+        int stepIndexWhenStarted = currentStepIndex;
+        Debug.Log($"CommandTimeoutRoutine: Starting wait for {commandTimeoutDuration}s for therapy step {stepIndexWhenStarted}");
+
         yield return new WaitForSeconds(commandTimeoutDuration);
-        
-        // When timeout occurs, provide feedback
-        feedbackManager.PlayTimeoutFeedback("I haven't heard a command in a while. Say \"Continue\" to move forward or \"End session\" to stop.");
-        
-        // Update enhanced UI if available
-        if (enhancedUI != null)
-        {
+
+        if (currentState != SessionState.Active || currentStepIndex != stepIndexWhenStarted || timeoutCoroutine == null) {
+             Debug.Log($"CommandTimeoutRoutine: State/Step changed or coroutine stopped during wait for step {stepIndexWhenStarted}. Exiting timeout.");
+             yield break;
+        }
+
+        Debug.Log($"CommandTimeoutRoutine: Timeout reached for therapy step {stepIndexWhenStarted}. Playing feedback.");
+        string timeoutMessage = "I haven't heard a command in a while. Say \"Continue\" to move forward or \"End session\" to stop.";
+        feedbackManager.PlayTimeoutFeedback(timeoutMessage); // Speaks via TTSManager
+
+        if (enhancedUI != null) {
             enhancedUI.SendMessage("UpdateStatusText", "Haven't heard a command. Say \"Continue\" or use manual controls.", SendMessageOptions.DontRequireReceiver);
         }
-        
-        // Wait for additional time before auto-advancing
-        yield return new WaitForSeconds(commandTimeoutDuration);
-        
-        // Auto-advance if still no response
-        feedbackManager.ShowMessage("Auto-advancing to next step due to inactivity");
-        AdvanceToNextStep();
+        timeoutCoroutine = null;
     }
+
+    // Ensure interface/class definitions are handled correctly (likely in TherapyStep.cs)
+    /*
+    public interface StepBehavior { ... }
+    [System.Serializable] public class TherapyStep { ... }
+    */
 }
