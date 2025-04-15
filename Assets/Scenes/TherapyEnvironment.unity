@@ -2415,7 +2415,7 @@ MonoBehaviour:
   OnSpeakStart:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 848500813}
+      - m_Target: {fileID: 1735179254}
         m_TargetAssemblyTypeName: OrbAnimator, Assembly-CSharp
         m_MethodName: HandleSpeakStart
         m_Mode: 1
@@ -2430,7 +2430,7 @@ MonoBehaviour:
   OnSpeakEnd:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 848500813}
+      - m_Target: {fileID: 1735179254}
         m_TargetAssemblyTypeName: OrbAnimator, Assembly-CSharp
         m_MethodName: HandleSpeakEnd
         m_Mode: 1
@@ -9246,6 +9246,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1373531276}
   - component: {fileID: 1373531275}
+  - component: {fileID: 1373531278}
+  - component: {fileID: 1373531277}
   m_Layer: 0
   m_Name: App Voice Experience
   m_TagString: Untagged
@@ -9355,7 +9357,7 @@ MonoBehaviour:
   witRuntimeConfiguration:
     witConfiguration: {fileID: 11400000, guid: 86c0544c1041108489a26b4b744769c0, type: 2}
     minKeepAliveVolume: 0.0005
-    minKeepAliveTimeInSeconds: 2
+    minKeepAliveTimeInSeconds: 20
     minTranscriptionKeepAliveTimeInSeconds: 1
     maxRecordingTime: 20
     soundWakeThreshold: 0.1
@@ -9376,7 +9378,7 @@ MonoBehaviour:
         transcriptionResponses: 1
         composerResponses: 1
   usePlatformServices: 0
-  enableConsoleLogging: 0
+  enableConsoleLogging: 1
   sendTranscriptionEventsForMessages: 0
 --- !u!4 &1373531276
 Transform:
@@ -9393,6 +9395,65 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1102232203}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1373531277
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1373531274}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0a93535f06eabe47bf93b4b504873c8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  Voice: {fileID: 1373531275}
+  ValidateEarly: 0
+  searchText: Okay
+  exactMatch: 1
+  useRegex: 0
+  onUtteranceMatched:
+    m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 1514150619}
+        m_TargetAssemblyTypeName: VoiceCommandManager, Assembly-CSharp
+        m_MethodName: HandleWakeWordDetected
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+--- !u!114 &1373531278
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1373531274}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 591c3d6f017c11b4faa41506d75635b9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  Voice: {fileID: 1373531275}
+  ValidateEarly: 0
+  intent: activate_listener
+  confidenceThreshold: 0.6
+  valueMatchers: []
+  formattedValueEvents: []
+  onMultiValueEvent:
+    m_PersistentCalls:
+      m_Calls: []
+  onDidNotMatch:
+    m_PersistentCalls:
+      m_Calls: []
+  onOutOfDomain:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!1 &1378530904
 GameObject:
   m_ObjectHideFlags: 0
@@ -10489,7 +10550,6 @@ GameObject:
   m_Component:
   - component: {fileID: 1514150618}
   - component: {fileID: 1514150619}
-  - component: {fileID: 1514150620}
   m_Layer: 0
   m_Name: VoiceManager
   m_TagString: Untagged
@@ -10526,9 +10586,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   voiceService: {fileID: 1373531275}
   verboseDiagnostics: 1
-  matchThreshold: 0.8
   sessionController: {fileID: 1915409807}
   feedbackManager: {fileID: 443109699}
+  visualizationEnvironment: {fileID: 1974457098}
   startSessionCommands:
   - start therapy
   - begin session
@@ -10538,25 +10598,45 @@ MonoBehaviour:
   endSessionCommands:
   - end session
   - stop therapy
-  visualizationEnvironment: {fileID: 1974457098}
---- !u!114 &1514150620
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1514150617}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a960272debaf35b4f8df9292e4191044, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  witDictation: {fileID: 0}
-  linesBetweenActivations: 2
-  activationSeparator: 
-  onTranscriptionUpdated:
-    m_PersistentCalls:
-      m_Calls: []
+  commonMistranscriptions:
+    _keys:
+    - next up
+    - text
+    - nest
+    - necks
+    - next to
+    - next please
+    - next one
+    - next time
+    - next day
+    - began
+    - beginning
+    - begins
+    - started
+    - starting
+    - starts
+    - and
+    - ending
+    - ends
+    _values:
+    - next
+    - next
+    - next
+    - next
+    - next
+    - next
+    - next
+    - next
+    - next
+    - begin
+    - begin
+    - begin
+    - start
+    - start
+    - start
+    - end
+    - end
+    - end
 --- !u!1001 &1517813974
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -12695,33 +12775,33 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   welcomeMessageText: 'Welcome to Voice-Driven Therapy.
 
-    Say "Start therapy"
-    or "Begin session" to start.'
+    Say ''Okay'', then ''Begin
+    session'' to start.'
   completionMessageText: 'Session complete. Thank you for participating.
 
-    Say
-    "Start therapy" to begin again.'
+    See
+    you next time!'
   therapySteps:
   - instructions: Welcome to the relaxation session. Find a comfortable position
-      and prepare to follow along. Say 'Continue' when you're ready.
+      and prepare to follow along. Say 'Okay', then 'Continue' when you're ready.
     stepBehaviorComponent: {fileID: 0}
   - instructions: Let's start with a breathing exercise. Breathe in slowly for 4
       counts, hold for 2, and breathe out for 6. Follow along with the visual guide.
-      Say 'Continue' when you're ready to move on.
+      Say 'Okay', then 'Continue' when you're ready to move on.
     stepBehaviorComponent: {fileID: 1843634353}
-  - instructions: Imagine yourself in a peaceful place. It could be a beach, a forest,
-      or anywhere you feel safe and calm. Take a moment to notice the details around
-      you. What do you see? What do you hear? Say 'Continue' when you're ready.
+  - instructions: Imagine yourself in a peaceful place. Take a moment to notice the
+      details around you. What do you see? What do you hear? You can also change
+      the lighting here. Try saying 'make the light blue' or  'make it brighter'.
+      When you are ready to move on, say 'Okay', then say 'Continue'.
     stepBehaviorComponent: {fileID: 1974457098}
   - instructions: 'Now we''ll practice some positive affirmations. Repeat after me:
       ''I am calm. I am strong. I am capable.'' Take your time with each phrase.
-      Say ''Continue'' when you''re ready.'
+      Say ''Okay'', then ''Continue'' when you''re ready.'
     stepBehaviorComponent: {fileID: 539035430}
   - instructions: Great job completing today's session. Take a moment to notice how
       you feel now compared to when we started. When you're ready to finish, say
-      'End session'.
+      'Okay', then 'End session'.
     stepBehaviorComponent: {fileID: 0}
-  commandTimeoutDuration: 30
   instructionText: {fileID: 1665937619}
   voiceCommandManager: {fileID: 1514150619}
   feedbackManager: {fileID: 443109699}
